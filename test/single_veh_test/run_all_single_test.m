@@ -4,7 +4,7 @@
 % -------------------------------------------------------------------------
 
 % === USER CONFIGURATION ===
-modelsFolder = fullfile(pwd, 'test', 'multi_veh_test/');
+modelsFolder = fullfile(pwd, 'test', 'single_veh_test/');
 searchSubfolders = false;                  % set false for top-level only
 closeAfterSim = true;                     % close models after running
 
