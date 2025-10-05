@@ -42,7 +42,7 @@ The initial velocity of the ego car is 20 m/s. The initial ego position is 20 m.
 ### 6. Lead Vehicle Decreasing Space Gap
 This simulation is defined in ```case_6_lead_decreasing_space_gap.slx```.
 
-The initial space gap is 40 m. Both vehicles start with a velocity of 20 m/s. The lead vehicle has a constant decleration of -0.5 m/s2.
+The initial space gap is 40 m. Both vehicles start with a velocity of 20 m/s. The lead vehicle has a constant deceleration of -0.5 m/s2.
 
 ### 7. Lead Vehicle Slows Then Steady
 This simulation is defined in ```case_7_lead_slow_down_then_steady.slx```.
