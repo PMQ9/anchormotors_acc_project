@@ -2,7 +2,7 @@
 
 ## How to Run Tests
 
-Running the MATLAB script ```run_all_multi_test.m``` will iterate through all the models that define the multiple vehicle tests. Each test includes the ```multi_vehicle_test_subsystem.slx```. This subsystem checks the following:
+Running the MATLAB script ```run_all_multi_test.m``` will iterate through all the models that define the multiple vehicle tests. ChatGPT wrote this script. Each test includes the ```multi_vehicle_test_subsystem.slx```. This subsystem checks the following:
 
 - The space gap must be above a minimum value.
 - The magnitude of the jerk must be below a certain value.
