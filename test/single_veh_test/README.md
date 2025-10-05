@@ -2,7 +2,7 @@
 
 ## How to Run Tests
 
-Running the MATLAB script ```run_all_single_test.m``` will iterate through all the models that define the single vehicle tests. Each test has a function defined that will print any errors in execution to the console. In most of the single vehicle tests, only the command acceleration is tested. We wamt to make sure that the ACC output acceleration is reasonable in the given situation.
+Running the MATLAB script ```run_all_single_test.m``` will iterate through all the models that define the single vehicle tests. ChatGPT wrote this script. Each test has a function defined that will print any errors in execution to the console. In most of the single vehicle tests, only the command acceleration is tested. We want to make sure that the ACC output acceleration is reasonable in the given situation.
 
 ## Test Cases
 
