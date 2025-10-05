@@ -16,7 +16,7 @@ The expected behavior is that the command acceleration should be negative.
 ### 2. Ego Vehicle Stopped, Space Gap Too Small
 This simulation is defined in ```case_2_ego0_gap_not_desired.slx```.
 
-The test defines a cases where the space gap is too small and the ego vehicle is stopped. The ego velocity is 0 m/s. The space gap is 0.9 m. The relative velocity is less than 5 m.
+The test defines a case where the space gap is too small and the ego vehicle is stopped. The ego velocity is 0 m/s. The space gap is 0.9 m. The relative velocity is less than 5 m.
 
 The expected behavior is that the command acceleration should be 0.
 
@@ -65,9 +65,9 @@ The expected behavior is that the acceleration is positive.
 ### 9. Ego Vehicle Stopped, Lead Car Accelerating
 This simulation is defined in ```case_9_ego_stopped_lead_accelerating.slx```.
 
-The test defines a scenario where the space gap and and relative velocity are increasing. The ego velocity is 0 m/s.
+The test defines a scenario where the space gap and relative velocity are increasing. The ego velocity is 0 m/s.
 
-Th expected behavior is that the command acceleration should be positive.
+The expected behavior is that the command acceleration should be positive.
 
 ### 10. Lead Vehicle Gradually Slows to a Stop
 This simulation is defined in ```case_10_lead_gradually_slows_down.slx```.
