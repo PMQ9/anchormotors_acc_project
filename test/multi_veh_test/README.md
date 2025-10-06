@@ -50,7 +50,9 @@ This simulation is defined in ```case_7_lead_slow_down_then_steady.slx```.
 The initial space gap is 50 m. The initial ego velocity is 20 m/s. The lead vehicle has an initial acceleration of -2 m/s2 then 0 m/s2. The lead vehicle initial velocity is 20 m/s.
 
 ### 8. Lead Vehicle Steady Then Speeds Up
-This simulation is defined in ``````.
+This simulation is defined in ```case_8_lead_car_stationary_ego_speedup25a.slx```.
+
+The initial space gap is 30 m. The initial ego velocity is 0 m/s. The lead car is initially stationary then increases velocity.
 
 ### 9. Lead Vehicle and Ego Vehicle Stopped, Space Gap Too Big
 This simulation is defined in ```case_9_both_stopped_gap_too_big.slx```.
