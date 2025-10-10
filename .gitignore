@@ -2,3 +2,6 @@
 *.mat
 *.l
 *.slx.r*
+test_reports/*
+test/single_veh_test/results/*.txt
+test/single_veh_test/results/*.png
