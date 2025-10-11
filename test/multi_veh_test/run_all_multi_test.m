@@ -66,9 +66,12 @@ for k = 1:numel(modelFiles)
     % Initialize test case data
     testCase = struct();
     testCase.name = modelName;
-    testCase.status = 'Failed';
+    testCase.status = 'Passed';  % Default to passed, will be updated based on warnings/errors
     testCase.warnings = {};
     testCase.errors = {};
+    testCase.warningTypes = containers.Map('KeyType', 'char', 'ValueType', 'any');  % Map for unique warning types
+    testCase.errorTypes = containers.Map('KeyType', 'char', 'ValueType', 'any');    % Map for unique error types
+    testCase.unclassifiedTypes = containers.Map('KeyType', 'char', 'ValueType', 'any');  % Map for unclassified messages
     testCase.plotFiles = {};
 
     % Setup warning capture - use diary to capture all warnings
@@ -88,7 +91,7 @@ for k = 1:numel(modelFiles)
         % Run simulation (normal mode so disp() messages appear)
         simOut = sim(modelName, 'SimulationMode', 'normal', 'StopTime', '20');
         fprintf('Simulation completed successfully: %s%s\n', modelName, ext);
-        testCase.status = 'Passed';
+        % Status will be determined after parsing warnings/errors
 
         % Export plots if scope data or logged signals are available
         try
@@ -103,7 +106,9 @@ for k = 1:numel(modelFiles)
 
     catch ME
         fprintf(2, 'Error running model "%s": %s\n', modelName, ME.message);
-        testCase.errors = {ME.message};
+        % Store critical simulation error
+        errorType = sprintf('Simulation Error: %s', ME.message);
+        testCase.errorTypes(errorType) = struct('count', 1, 'firstOccurrence', errorType);
         testCase.status = 'Failed';
     end
 
@@ -133,26 +138,60 @@ for k = 1:numel(modelFiles)
                     continue;
                 end
 
-                % Capture lines starting with "Warning:" (MATLAB warnings)
-                if startsWith(line, 'Warning:')
-                    warningMsg = strtrim(line);
-                    % Clean up MATLAB hyperlinks
-                    warningMsg = regexprep(warningMsg, '<a[^>]*>', '');
-                    warningMsg = regexprep(warningMsg, '</a>', '');
-                    warningMsg = regexprep(warningMsg, 'href="[^"]*"', '');
-                    testCase.warnings{end+1} = warningMsg;
                 % Capture lines starting with "Error:" (disp output from blocks)
-                elseif startsWith(line, 'Error:')
-                    testCase.warnings{end+1} = line;
-                % Capture any line with "href" (Stateflow warnings with links)
-                elseif contains(line, 'href') && ~isempty(regexp(line, '[a-zA-Z]', 'once'))
+                if startsWith(line, 'Error:')
+                    % Extract error type by removing timestamps and specific numeric values
+                    errorType = extractMessageType(line);
+
+                    % Update error type count
+                    if testCase.errorTypes.isKey(errorType)
+                        data = testCase.errorTypes(errorType);
+                        data.count = data.count + 1;
+                        testCase.errorTypes(errorType) = data;
+                    else
+                        testCase.errorTypes(errorType) = struct('count', 1, 'firstOccurrence', line);
+                    end
+
+                % Capture lines starting with "Warning:" (MATLAB warnings)
+                elseif startsWith(line, 'Warning:')
                     warningMsg = strtrim(line);
                     % Clean up MATLAB hyperlinks
                     warningMsg = regexprep(warningMsg, '<a[^>]*>', '');
                     warningMsg = regexprep(warningMsg, '</a>', '');
                     warningMsg = regexprep(warningMsg, 'href="[^"]*"', '');
-                    if ~isempty(warningMsg) && ~any(strcmp(testCase.warnings, warningMsg))
-                        testCase.warnings{end+1} = warningMsg;
+
+                    % Extract warning type
+                    warningType = extractMessageType(warningMsg);
+
+                    % Update warning type count
+                    if testCase.warningTypes.isKey(warningType)
+                        data = testCase.warningTypes(warningType);
+                        data.count = data.count + 1;
+                        testCase.warningTypes(warningType) = data;
+                    else
+                        testCase.warningTypes(warningType) = struct('count', 1, 'firstOccurrence', warningMsg);
+                    end
+
+                % Capture any line with "href" or other messages (unclassified warnings)
+                elseif ~isempty(line) && ~isempty(regexp(line, '[a-zA-Z]', 'once'))
+                    unclassifiedMsg = strtrim(line);
+                    % Clean up MATLAB hyperlinks
+                    unclassifiedMsg = regexprep(unclassifiedMsg, '<a[^>]*>', '');
+                    unclassifiedMsg = regexprep(unclassifiedMsg, '</a>', '');
+                    unclassifiedMsg = regexprep(unclassifiedMsg, 'href="[^"]*"', '');
+
+                    if ~isempty(unclassifiedMsg)
+                        % Extract message type
+                        msgType = extractMessageType(unclassifiedMsg);
+
+                        % Update unclassified type count
+                        if testCase.unclassifiedTypes.isKey(msgType)
+                            data = testCase.unclassifiedTypes(msgType);
+                            data.count = data.count + 1;
+                            testCase.unclassifiedTypes(msgType) = data;
+                        else
+                            testCase.unclassifiedTypes(msgType) = struct('count', 1, 'firstOccurrence', unclassifiedMsg);
+                        end
                     end
                 end
             end
@@ -160,10 +199,14 @@ for k = 1:numel(modelFiles)
             % Also check for lastwarn in case some warnings weren't captured
             [lastWarnMsg, lastWarnId] = lastwarn;
             if ~isempty(lastWarnMsg)
-                fullMsg = sprintf('[%s] %s', lastWarnId, lastWarnMsg);
-                % Add only if not already captured
-                if ~any(contains(testCase.warnings, lastWarnMsg))
-                    testCase.warnings{end+1} = fullMsg;
+                warningType = extractMessageType(lastWarnMsg);
+                if testCase.warningTypes.isKey(warningType)
+                    data = testCase.warningTypes(warningType);
+                    data.count = data.count + 1;
+                    testCase.warningTypes(warningType) = data;
+                else
+                    fullMsg = sprintf('[%s] %s', lastWarnId, lastWarnMsg);
+                    testCase.warningTypes(warningType) = struct('count', 1, 'firstOccurrence', fullMsg);
                 end
             end
         end
@@ -171,9 +214,28 @@ for k = 1:numel(modelFiles)
 
     warning(warnState); % Restore warning state
 
-    % Print warning summary
-    if ~isempty(testCase.warnings)
-        fprintf('  Captured %d warning(s) for %s\n', length(testCase.warnings), modelName);
+    % Determine final test status based on errors and warnings (not unclassified)
+    numErrors = testCase.errorTypes.Count;
+    numWarnings = testCase.warningTypes.Count;
+    numUnclassified = testCase.unclassifiedTypes.Count;
+
+    if numErrors > 0
+        testCase.status = 'Failed';
+    elseif numWarnings > 0
+        testCase.status = 'Passed with warnings';
+    else
+        testCase.status = 'Passed';
+    end
+
+    % Print warning/error summary
+    if numErrors > 0
+        fprintf('  Captured %d unique error type(s) for %s\n', numErrors, modelName);
+    end
+    if numWarnings > 0
+        fprintf('  Captured %d unique warning type(s) for %s\n', numWarnings, modelName);
+    end
+    if numUnclassified > 0
+        fprintf('  Captured %d unclassified message type(s) for %s\n', numUnclassified, modelName);
     end
 
     % Add test case to report data
@@ -205,6 +267,35 @@ if generatePDFReport
     end
 
     fprintf('=============================================================\n');
+end
+
+% -------------------------------------------------------------------------
+% Helper function to extract message type (remove timestamps and specific values)
+function msgType = extractMessageType(msg)
+    % Remove timestamps in various formats
+    % Pattern: at t=X.XXX or at t = X.XXX
+    msgType = regexprep(msg, 'at t\s*=\s*[\d\.]+', 'at t=<TIME>');
+
+    % Replace specific numeric values with placeholders
+    % Pattern: standalone numbers (positive or negative, with decimals)
+    msgType = regexprep(msgType, ':\s*-?[\d\.]+\s+at', ': <VALUE> at');
+    msgType = regexprep(msgType, ':\s*-?[\d\.]+\s*$', ': <VALUE>');
+
+    % Pattern: numbers followed by > or < (like "> 0.500")
+    msgType = regexprep(msgType, '-?[\d\.]+\s*>', '<VALUE> >');
+    msgType = regexprep(msgType, '-?[\d\.]+\s*<', '<VALUE> <');
+
+    % Pattern: violation values (like "violation: X.XXX")
+    msgType = regexprep(msgType, 'violation:\s*-?[\d\.]+', 'violation: <VALUE>');
+    msgType = regexprep(msgType, 'detected:\s*-?[\d\.]+', 'detected: <VALUE>');
+    msgType = regexprep(msgType, 'limit:\s*-?[\d\.]+', 'limit: <VALUE>');
+    msgType = regexprep(msgType, 'exceeded\s+limit:\s*-?[\d\.]+', 'exceeded limit: <VALUE>');
+
+    % Pattern: gap values
+    msgType = regexprep(msgType, 'gap\s+violation:\s*-?[\d\.]+', 'gap violation: <VALUE>');
+
+    % Clean up any remaining standalone decimal numbers in the middle of text
+    msgType = regexprep(msgType, '\s-?[\d\.]+\s', ' <VALUE> ');
 end
 
 % -------------------------------------------------------------------------
@@ -390,7 +481,8 @@ function generatePDFReport_func(reportData, pdfFilename)
 
     totalTests = length(reportData.testCases);
     passedTests = sum(cellfun(@(x) strcmp(x.status, 'Passed'), reportData.testCases));
-    failedTests = totalTests - passedTests;
+    passedWithWarningsTests = sum(cellfun(@(x) strcmp(x.status, 'Passed with warnings'), reportData.testCases));
+    failedTests = sum(cellfun(@(x) strcmp(x.status, 'Failed'), reportData.testCases));
 
     p = Paragraph(sprintf('Total Tests: %d', totalTests));
     p.Style = {FontSize('14pt'), Bold()};
@@ -400,9 +492,53 @@ function generatePDFReport_func(reportData, pdfFilename)
     p.Style = {FontSize('14pt'), Color('green'), Bold()};
     add(ch, p);
 
+    p = Paragraph(sprintf('Passed with warnings: %d', passedWithWarningsTests));
+    p.Style = {FontSize('14pt'), Color('orange'), Bold()};
+    add(ch, p);
+
     p = Paragraph(sprintf('Failed: %d', failedTests));
     p.Style = {FontSize('14pt'), Color('red'), Bold()};
     add(ch, p);
+
+    % Add detailed list of test results by category
+    if passedTests > 0
+        add(ch, Paragraph(' '));
+        p = Paragraph('Passed Tests:');
+        p.Style = {FontSize('12pt'), Color('green'), Bold()};
+        add(ch, p);
+        for i = 1:length(reportData.testCases)
+            if strcmp(reportData.testCases{i}.status, 'Passed')
+                p = Paragraph(sprintf('  - %s', strrep(reportData.testCases{i}.name, '_', ' ')));
+                add(ch, p);
+            end
+        end
+    end
+
+    if passedWithWarningsTests > 0
+        add(ch, Paragraph(' '));
+        p = Paragraph('Passed with Warnings Tests:');
+        p.Style = {FontSize('12pt'), Color('orange'), Bold()};
+        add(ch, p);
+        for i = 1:length(reportData.testCases)
+            if strcmp(reportData.testCases{i}.status, 'Passed with warnings')
+                p = Paragraph(sprintf('  - %s', strrep(reportData.testCases{i}.name, '_', ' ')));
+                add(ch, p);
+            end
+        end
+    end
+
+    if failedTests > 0
+        add(ch, Paragraph(' '));
+        p = Paragraph('Failed Tests:');
+        p.Style = {FontSize('12pt'), Color('red'), Bold()};
+        add(ch, p);
+        for i = 1:length(reportData.testCases)
+            if strcmp(reportData.testCases{i}.status, 'Failed')
+                p = Paragraph(sprintf('  - %s', strrep(reportData.testCases{i}.name, '_', ' ')));
+                add(ch, p);
+            end
+        end
+    end
 
     add(rpt, ch);
 
@@ -417,6 +553,8 @@ function generatePDFReport_func(reportData, pdfFilename)
         p = Paragraph(sprintf('Status: %s', testCase.status));
         if strcmp(testCase.status, 'Passed')
             p.Style = {FontSize('12pt'), Color('green'), Bold()};
+        elseif strcmp(testCase.status, 'Passed with warnings')
+            p.Style = {FontSize('12pt'), Color('orange'), Bold()};
         else
             p.Style = {FontSize('12pt'), Color('red'), Bold()};
         end
@@ -438,23 +576,72 @@ function generatePDFReport_func(reportData, pdfFilename)
             end
         end
 
-        % Add warnings if any
-        if ~isempty(testCase.warnings)
-            add(ch, Heading2('Warnings'));
-            for j = 1:length(testCase.warnings)
-                p = Paragraph(testCase.warnings{j});
-                p.Style = {FontFamily('Courier'), FontSize('10pt'), Color('orange')};
+        % Add errors if any
+        if testCase.errorTypes.Count > 0
+            add(ch, Heading2('Errors Summary'));
+            errorKeys = keys(testCase.errorTypes);
+            for j = 1:length(errorKeys)
+                errorKey = errorKeys{j};
+                errorData = testCase.errorTypes(errorKey);
+
+                % Format: "Error type (count: X)"
+                p = Paragraph(sprintf('%s (Count: %d)', errorKey, errorData.count));
+                p.Style = {FontFamily('Courier'), FontSize('10pt'), Color('red'), Bold()};
                 add(ch, p);
+
+                % Add first occurrence as example
+                if errorData.count > 1
+                    p = Paragraph(sprintf('  Example: %s', errorData.firstOccurrence));
+                    p.Style = {FontFamily('Courier'), FontSize('9pt'), Color('gray')};
+                    add(ch, p);
+                end
+                add(ch, Paragraph(' ')); % Spacer
             end
         end
 
-        % Add errors if any
-        if ~isempty(testCase.errors)
-            add(ch, Heading2('Errors'));
-            for j = 1:length(testCase.errors)
-                p = Paragraph(testCase.errors{j});
-                p.Style = {FontFamily('Courier'), FontSize('10pt'), Color('red')};
+        % Add warnings if any
+        if testCase.warningTypes.Count > 0
+            add(ch, Heading2('Warnings Summary'));
+            warningKeys = keys(testCase.warningTypes);
+            for j = 1:length(warningKeys)
+                warningKey = warningKeys{j};
+                warningData = testCase.warningTypes(warningKey);
+
+                % Format: "Warning type (count: X)"
+                p = Paragraph(sprintf('%s (Count: %d)', warningKey, warningData.count));
+                p.Style = {FontFamily('Courier'), FontSize('10pt'), Color('orange'), Bold()};
                 add(ch, p);
+
+                % Add first occurrence as example
+                if warningData.count > 1
+                    p = Paragraph(sprintf('  Example: %s', warningData.firstOccurrence));
+                    p.Style = {FontFamily('Courier'), FontSize('9pt'), Color('gray')};
+                    add(ch, p);
+                end
+                add(ch, Paragraph(' ')); % Spacer
+            end
+        end
+
+        % Add unclassified warnings if any
+        if testCase.unclassifiedTypes.Count > 0
+            add(ch, Heading2('Unclassified Warnings'));
+            unclassifiedKeys = keys(testCase.unclassifiedTypes);
+            for j = 1:length(unclassifiedKeys)
+                unclassifiedKey = unclassifiedKeys{j};
+                unclassifiedData = testCase.unclassifiedTypes(unclassifiedKey);
+
+                % Format: "Message type (count: X)"
+                p = Paragraph(sprintf('%s (Count: %d)', unclassifiedKey, unclassifiedData.count));
+                p.Style = {FontFamily('Courier'), FontSize('10pt'), Color('gray'), Bold()};
+                add(ch, p);
+
+                % Add first occurrence as example
+                if unclassifiedData.count > 1
+                    p = Paragraph(sprintf('  Example: %s', unclassifiedData.firstOccurrence));
+                    p.Style = {FontFamily('Courier'), FontSize('9pt'), Color('gray')};
+                    add(ch, p);
+                end
+                add(ch, Paragraph(' ')); % Spacer
             end
         end
 
