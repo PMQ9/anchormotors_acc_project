@@ -7,7 +7,7 @@
 % === USER CONFIGURATION ===
 modelsFolder = fullfile(pwd, 'test', 'single_veh_test/');
 searchSubfolders = false;                  % set false for top-level only
-closeAfterSim = true;                     % close models after running
+closeAfterSim = false;                     % close models after running
 generatePDFReport = true;                 % generate PDF report
 outputFolder = fullfile(modelsFolder, 'results');  % folder for outputs
 
