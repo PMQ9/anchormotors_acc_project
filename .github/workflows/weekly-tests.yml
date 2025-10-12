@@ -1,0 +1,92 @@
+name: Weekly Automated Tests
+
+on:
+  # Run every Monday at 9:00 AM UTC
+  schedule:
+    - cron: '0 9 * * 1'
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+
+jobs:
+  test-single-vehicle:
+    name: Single Vehicle Tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2025a
+
+      - name: Run Single Vehicle Tests
+        uses: matlab-actions/run-command@v2
+        with:
+          command: |
+            cd('test/single_veh_test');
+            run_all_single_test;
+
+      - name: Upload Single Vehicle Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: single-vehicle-test-results
+          path: test/single_veh_test/results/
+          retention-days: 30
+
+      - name: Check for test failures
+        if: failure()
+        run: echo "Single vehicle tests failed!"
+
+  test-multi-vehicle:
+    name: Multi Vehicle Tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2025a
+
+      - name: Run Multi Vehicle Tests
+        uses: matlab-actions/run-command@v2
+        with:
+          command: |
+            cd('test/multi_veh_test');
+            run_all_multi_test;
+
+      - name: Upload Multi Vehicle Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: multi-vehicle-test-results
+          path: test/multi_veh_test/results/
+          retention-days: 30
+
+      - name: Check for test failures
+        if: failure()
+        run: echo "Multi vehicle tests failed!"
+
+  notify-results:
+    name: Notify Test Results
+    needs: [test-single-vehicle, test-multi-vehicle]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check overall status
+        run: |
+          if [ "${{ needs.test-single-vehicle.result }}" == "success" ] && [ "${{ needs.test-multi-vehicle.result }}" == "success" ]; then
+            echo "All tests passed!"
+            exit 0
+          else
+            echo "Some tests failed!"
+            echo "Single Vehicle: ${{ needs.test-single-vehicle.result }}"
+            echo "Multi Vehicle: ${{ needs.test-multi-vehicle.result }}"
+            exit 1
+          fi
