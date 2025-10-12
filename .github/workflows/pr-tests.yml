@@ -37,7 +37,9 @@ jobs:
           release: R2025a
 
       - name: Run Single Vehicle Tests
+        id: single_vehicle_tests
         uses: matlab-actions/run-command@v2
+        continue-on-error: true
         with:
           command: |
             cd('test/single_veh_test');
@@ -50,6 +52,51 @@ jobs:
           name: pr-${{ github.event.pull_request.number }}-single-vehicle-results
           path: test/single_veh_test/results/
           retention-days: 14
+
+      - name: Send logs to Grafana Loki
+        if: always()
+        env:
+          LOKI_URL: ${{ secrets.GRAFANA_LOKI_URL }}
+          LOKI_USER: ${{ secrets.GRAFANA_LOKI_USERNAME }}
+          LOKI_KEY: ${{ secrets.GRAFANA_LOKI_API_KEY }}
+        shell: bash
+        run: |
+          # Only send logs if Grafana Loki is configured
+          if [ -z "$LOKI_URL" ]; then
+            echo "Grafana Loki not configured, skipping logs"
+            exit 0
+          fi
+
+          # Get current timestamp in nanoseconds
+          TIMESTAMP=$(date +%s%N)
+
+          # Create log message
+          MESSAGE="Test completed: single-vehicle tests ${{ steps.single_vehicle_tests.outcome }}"
+
+          # Create Loki push payload
+          cat <<EOF | curl -X POST "$LOKI_URL" \
+            -u "$LOKI_USER:$LOKI_KEY" \
+            -H "Content-Type: application/json" \
+            --data-binary @- || echo "Failed to send logs to Grafana Loki"
+          {
+            "streams": [
+              {
+                "stream": {
+                  "job": "github-actions",
+                  "workflow": "pr-tests",
+                  "test_type": "single-vehicle",
+                  "repository": "${{ github.repository }}",
+                  "branch": "${{ github.head_ref || github.ref_name }}",
+                  "event": "${{ github.event_name }}",
+                  "status": "${{ steps.single_vehicle_tests.outcome }}"
+                },
+                "values": [
+                  ["$TIMESTAMP", "$MESSAGE"]
+                ]
+              }
+            ]
+          }
+          EOF
 
       - name: Comment PR with results
         if: always() && github.event_name == 'pull_request'
@@ -89,7 +136,9 @@ jobs:
           release: R2025a
 
       - name: Run Multi Vehicle Tests
+        id: multi_vehicle_tests
         uses: matlab-actions/run-command@v2
+        continue-on-error: true
         with:
           command: |
             cd('test/multi_veh_test');
@@ -102,6 +151,51 @@ jobs:
           name: pr-${{ github.event.pull_request.number }}-multi-vehicle-results
           path: test/multi_veh_test/results/
           retention-days: 14
+
+      - name: Send logs to Grafana Loki
+        if: always()
+        env:
+          LOKI_URL: ${{ secrets.GRAFANA_LOKI_URL }}
+          LOKI_USER: ${{ secrets.GRAFANA_LOKI_USERNAME }}
+          LOKI_KEY: ${{ secrets.GRAFANA_LOKI_API_KEY }}
+        shell: bash
+        run: |
+          # Only send logs if Grafana Loki is configured
+          if [ -z "$LOKI_URL" ]; then
+            echo "Grafana Loki not configured, skipping logs"
+            exit 0
+          fi
+
+          # Get current timestamp in nanoseconds
+          TIMESTAMP=$(date +%s%N)
+
+          # Create log message
+          MESSAGE="Test completed: multi-vehicle tests ${{ steps.multi_vehicle_tests.outcome }}"
+
+          # Create Loki push payload
+          cat <<EOF | curl -X POST "$LOKI_URL" \
+            -u "$LOKI_USER:$LOKI_KEY" \
+            -H "Content-Type: application/json" \
+            --data-binary @- || echo "Failed to send logs to Grafana Loki"
+          {
+            "streams": [
+              {
+                "stream": {
+                  "job": "github-actions",
+                  "workflow": "pr-tests",
+                  "test_type": "multi-vehicle",
+                  "repository": "${{ github.repository }}",
+                  "branch": "${{ github.head_ref || github.ref_name }}",
+                  "event": "${{ github.event_name }}",
+                  "status": "${{ steps.multi_vehicle_tests.outcome }}"
+                },
+                "values": [
+                  ["$TIMESTAMP", "$MESSAGE"]
+                ]
+              }
+            ]
+          }
+          EOF
 
       - name: Comment PR with results
         if: always() && github.event_name == 'pull_request'
