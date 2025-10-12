@@ -16,6 +16,12 @@ on:
   # Allow manual trigger
   workflow_dispatch:
 
+# Add permissions for the workflow to write comments to PRs
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   test-single-vehicle:
     name: Single Vehicle Tests

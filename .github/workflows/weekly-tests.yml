@@ -7,6 +7,10 @@ on:
   # Allow manual trigger from Actions tab
   workflow_dispatch:
 
+# Set minimal permissions needed for this workflow
+permissions:
+  contents: read
+
 jobs:
   test-single-vehicle:
     name: Single Vehicle Tests
