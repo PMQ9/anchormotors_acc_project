@@ -389,7 +389,7 @@ function plotFile = generatePlotsFromSimulation(simOut, modelName, outputFolder)
     numSignals = length(dataToPlot);
     if numSignals > 0
         try
-            fig = figure('Visible', 'off', 'Position', [100, 100, 1200, 800]);
+            fig = figure('Visible', 'off', 'Position', [100, 100, 1600, 1200]);
 
             % Set white background for figure and paper
             set(fig, 'Color', 'white');
@@ -559,7 +559,7 @@ function generatePDFReport_func(reportData, pdfFilename)
                 if exist(testCase.plotFiles{j}, 'file')
                     img = Image(testCase.plotFiles{j});
                     % Make images larger - set explicit width to 90% of page width
-                    img.Style = {ScaleToFit(false), Width('6.5in'), Height('4.5in')};
+                    img.Style = {ScaleToFit(false), Width('8.5in'), Height('6.5in'), HAlign('center')};
                     add(ch, img);
                     add(ch, Paragraph(' ')); % Add spacing after image
                 end
