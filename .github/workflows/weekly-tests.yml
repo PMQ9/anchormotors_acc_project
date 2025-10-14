@@ -34,6 +34,31 @@ jobs:
             cd('test/single_veh_test');
             run_all_single_test;
 
+      # NEW: Set up Python and extract metrics from PDF
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PDF dependencies
+        run: pip install pdfplumber
+
+      - name: Extract metrics from Single Vehicle PDF
+        id: extract_single_metrics
+        shell: bash
+        run: |
+          # Find the generated PDF (pattern matches test_report_*.pdf)
+          PDF=$(ls test/single_veh_test/results/test_report_*.pdf | head -n 1)
+          if [ -z "$PDF" ]; then
+            echo "No PDF report found!"
+            exit 1
+          fi
+          
+          # Run Python script and source outputs to GITHUB_ENV
+          while IFS= read -r line; do
+            echo "$line" >> $GITHUB_ENV
+          done < <(python .github/scripts/extract_pdf_report_metrics.py "$PDF")
+
       - name: Upload Single Vehicle Test Results
         uses: actions/upload-artifact@v4
         if: always()
@@ -60,7 +85,8 @@ jobs:
           TIMESTAMP=$(date +%s%N)
 
           # Create log message
-          MESSAGE="Test completed: single-vehicle tests ${{ steps.single_vehicle_tests.outcome }}"
+          MESSAGE="Test completed: single-vehicle tests ${{ steps.single_vehicle_tests.outcome }} total=${{ env.total_tests }} passed=${{ env.passed }} passed_w_warnings=${{ env.passed_with_warnings }} failed=${{ env.failed }}"
+          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/\n/\\n/g')
 
           # Create Loki push payload
           cat <<EOF | curl -X POST "$LOKI_URL" \
@@ -80,7 +106,7 @@ jobs:
                   "status": "${{ steps.single_vehicle_tests.outcome }}"
                 },
                 "values": [
-                  ["$TIMESTAMP", "$MESSAGE"]
+                  ["$TIMESTAMP", "$ESCAPED_MESSAGE"]
                 ]
               }
             ]
@@ -113,6 +139,31 @@ jobs:
             cd('test/multi_veh_test');
             run_all_multi_test;
 
+      # NEW: Set up Python and extract metrics from PDF
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PDF dependencies
+        run: pip install pdfplumber
+
+      - name: Extract metrics from Multi Vehicle PDF
+        id: extract_multi_metrics
+        shell: bash
+        run: |
+          # Find the generated PDF (pattern matches test_report_*.pdf)
+          PDF=$(ls test/multi_veh_test/results/test_report_*.pdf | head -n 1)
+          if [ -z "$PDF" ]; then
+            echo "No PDF report found!"
+            exit 1
+          fi
+          
+          # Run Python script and source outputs to GITHUB_ENV
+          while IFS= read -r line; do
+            echo "$line" >> $GITHUB_ENV
+          done < <(python .github/scripts/extract_pdf_report_metrics.py "$PDF")
+
       - name: Upload Multi Vehicle Test Results
         uses: actions/upload-artifact@v4
         if: always()
@@ -139,7 +190,8 @@ jobs:
           TIMESTAMP=$(date +%s%N)
 
           # Create log message
-          MESSAGE="Test completed: multi-vehicle tests ${{ steps.multi_vehicle_tests.outcome }}"
+          MESSAGE="Test completed: multi-vehicle tests ${{ steps.multi_vehicle_tests.outcome }} total=${{ env.total_tests }} passed=${{ env.passed }} passed_w_warnings=${{ env.passed_with_warnings }} failed=${{ env.failed }}"
+          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/\n/\\n/g')
 
           # Create Loki push payload
           cat <<EOF | curl -X POST "$LOKI_URL" \
@@ -159,7 +211,7 @@ jobs:
                   "status": "${{ steps.multi_vehicle_tests.outcome }}"
                 },
                 "values": [
-                  ["$TIMESTAMP", "$MESSAGE"]
+                  ["$TIMESTAMP", "$ESCAPED_MESSAGE"]
                 ]
               }
             ]
