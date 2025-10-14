@@ -26,6 +26,11 @@ jobs:
   test-single-vehicle:
     name: Single Vehicle Tests
     runs-on: windows-latest
+    outputs:
+      total_tests: ${{ env.total_tests }}
+      passed: ${{ env.passed }}
+      passed_with_warnings: ${{ env.passed_with_warnings }}
+      failed: ${{ env.failed }}
 
     steps:
       - name: Checkout repository
@@ -44,6 +49,30 @@ jobs:
           command: |
             cd('test/single_veh_test');
             run_all_single_test;
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PDF dependencies
+        run: pip install pdfplumber
+
+      - name: Extract metrics from Single Vehicle PDF
+        id: extract_single_metrics
+        shell: bash
+        run: |
+          # Find the generated PDF (pattern matches test_report_*.pdf)
+          PDF=$(ls test/single_veh_test/results/test_report_*.pdf | head -n 1)
+          if [ -z "$PDF" ]; then
+            echo "No PDF report found!"
+            exit 1
+          fi
+          
+          # Run Python script and source outputs to GITHUB_ENV
+          while IFS= read -r line; do
+            echo "$line" >> $GITHUB_ENV
+          done < <(python .github/scripts/extract_pdf_report_metrics.py "$PDF")
 
       - name: Upload Single Vehicle Test Results
         uses: actions/upload-artifact@v4
@@ -70,8 +99,9 @@ jobs:
           # Get current timestamp in nanoseconds
           TIMESTAMP=$(date +%s%N)
 
-          # Create log message
-          MESSAGE="Test completed: single-vehicle tests ${{ steps.single_vehicle_tests.outcome }}"
+          # Enhanced message with metrics
+          MESSAGE="Test completed: single-vehicle tests ${{ steps.single_vehicle_tests.outcome }} total=${{ env.total_tests }} passed=${{ env.passed }} passed_w_warnings=${{ env.passed_with_warnings }} failed=${{ env.failed }}"
+          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/\n/\\n/g')
 
           # Create Loki push payload
           cat <<EOF | curl -X POST "$LOKI_URL" \
@@ -91,40 +121,50 @@ jobs:
                   "status": "${{ steps.single_vehicle_tests.outcome }}"
                 },
                 "values": [
-                  ["$TIMESTAMP", "$MESSAGE"]
+                  ["$TIMESTAMP", "$ESCAPED_MESSAGE"]
                 ]
               }
             ]
           }
           EOF
 
-      - name: Comment PR with results
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const resultPath = 'test/single_veh_test/results';
-            let comment = '## Single Vehicle Test Results\n\n';
+      # - name: Comment PR with results
+      #   if: always() && github.event_name == 'pull_request'
+      #   uses: actions/github-script@v7
+      #   with:
+      #     script: |
+      #       const fs = require('fs');
+      #       const resultPath = 'test/single_veh_test/results';
+      #       let comment = '## Single Vehicle Test Results\n\n';
 
-            if ('${{ job.status }}' === 'success') {
-              comment += ':white_check_mark: Tests passed successfully!\n\n';
-            } else {
-              comment += ':x: Tests failed!\n\n';
-            }
+      #       if ('${{ job.status }}' === 'success') {
+      #         comment += ':white_check_mark: Tests passed successfully!\n\n';
+      #       } else {
+      #         comment += ':x: Tests failed!\n\n';
+      #       }
 
-            comment += 'Download the full test report from the workflow artifacts.\n';
+      #       comment += `Total Tests: ${{ env.total_tests }}\n`;
+      #       comment += `Passed: ${{ env.passed }}\n`;
+      #       comment += `Passed with Warnings: ${{ env.passed_with_warnings }}\n`;
+      #       comment += `Failed: ${{ env.failed }}\n\n`;
 
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
+      #       comment += 'Download the full test report from the workflow artifacts.\n';
+
+      #       github.rest.issues.createComment({
+      #         issue_number: context.issue.number,
+      #         owner: context.repo.owner,
+      #         repo: context.repo.repo,
+      #         body: comment
+      #       });
 
   test-multi-vehicle:
     name: Multi Vehicle Tests
     runs-on: windows-latest
+    outputs:
+      total_tests: ${{ env.total_tests }}
+      passed: ${{ env.passed }}
+      passed_with_warnings: ${{ env.passed_with_warnings }}
+      failed: ${{ env.failed }}
 
     steps:
       - name: Checkout repository
@@ -143,6 +183,30 @@ jobs:
           command: |
             cd('test/multi_veh_test');
             run_all_multi_test;
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PDF dependencies
+        run: pip install pdfplumber
+
+      - name: Extract metrics from Multi Vehicle PDF
+        id: extract_multi_metrics
+        shell: bash
+        run: |
+          # Find the generated PDF (pattern matches test_report_*.pdf)
+          PDF=$(ls test/multi_veh_test/results/test_report_*.pdf | head -n 1)
+          if [ -z "$PDF" ]; then
+            echo "No PDF report found!"
+            exit 1
+          fi
+          
+          # Run Python script and source outputs to GITHUB_ENV
+          while IFS= read -r line; do
+            echo "$line" >> $GITHUB_ENV
+          done < <(python .github/scripts/extract_pdf_report_metrics.py "$PDF")
 
       - name: Upload Multi Vehicle Test Results
         uses: actions/upload-artifact@v4
@@ -169,8 +233,9 @@ jobs:
           # Get current timestamp in nanoseconds
           TIMESTAMP=$(date +%s%N)
 
-          # Create log message
-          MESSAGE="Test completed: multi-vehicle tests ${{ steps.multi_vehicle_tests.outcome }}"
+          # Enhanced message with metrics
+          MESSAGE="Test completed: multi-vehicle tests ${{ steps.multi_vehicle_tests.outcome }} total=${{ env.total_tests }} passed=${{ env.passed }} passed_w_warnings=${{ env.passed_with_warnings }} failed=${{ env.failed }}"
+          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/\n/\\n/g')
 
           # Create Loki push payload
           cat <<EOF | curl -X POST "$LOKI_URL" \
@@ -190,36 +255,41 @@ jobs:
                   "status": "${{ steps.multi_vehicle_tests.outcome }}"
                 },
                 "values": [
-                  ["$TIMESTAMP", "$MESSAGE"]
+                  ["$TIMESTAMP", "$ESCAPED_MESSAGE"]
                 ]
               }
             ]
           }
           EOF
 
-      - name: Comment PR with results
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const resultPath = 'test/multi_veh_test/results';
-            let comment = '## Multi Vehicle Test Results\n\n';
+      # - name: Comment PR with results
+      #   if: always() && github.event_name == 'pull_request'
+      #   uses: actions/github-script@v7
+      #   with:
+      #     script: |
+      #       const fs = require('fs');
+      #       const resultPath = 'test/multi_veh_test/results';
+      #       let comment = '## Multi Vehicle Test Results\n\n';
 
-            if ('${{ job.status }}' === 'success') {
-              comment += ':white_check_mark: Tests passed successfully!\n\n';
-            } else {
-              comment += ':x: Tests failed!\n\n';
-            }
+      #       if ('${{ job.status }}' === 'success') {
+      #         comment += ':white_check_mark: Tests passed successfully!\n\n';
+      #       } else {
+      #         comment += ':x: Tests failed!\n\n';
+      #       }
 
-            comment += 'Download the full test report from the workflow artifacts.\n';
+      #       comment += `Total Tests: ${{ env.total_tests }}\n`;
+      #       comment += `Passed: ${{ env.passed }}\n`;
+      #       comment += `Passed with Warnings: ${{ env.passed_with_warnings }}\n`;
+      #       comment += `Failed: ${{ env.failed }}\n\n`;
 
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
+      #       comment += 'Download the full test report from the workflow artifacts.\n';
+
+      #       github.rest.issues.createComment({
+      #         issue_number: context.issue.number,
+      #         owner: context.repo.owner,
+      #         repo: context.repo.repo,
+      #         body: comment
+      #       });
 
   pr-summary:
     name: PR Test Summary
@@ -230,19 +300,28 @@ jobs:
     steps:
       - name: Post overall summary
         uses: actions/github-script@v7
+        env:
+          ALLOW_PR_CI_TEST_BYPASS: ${{ vars.ALLOW_PR_CI_TEST_BYPASS }}
         with:
           script: |
             const singleVehicle = '${{ needs.test-single-vehicle.result }}';
             const multiVehicle = '${{ needs.test-multi-vehicle.result }}';
+            const allPassed = singleVehicle === 'success' && multiVehicle === 'success';
+            const bypassRaw = process.env.ALLOW_PR_CI_TEST_BYPASS || 'FALSE';
+            const bypass = bypassRaw === 'TRUE';
 
             let summary = '## Test Suite Summary\n\n';
-            summary += '| Test Suite | Status |\n';
-            summary += '|------------|--------|\n';
-            summary += `| Single Vehicle | ${singleVehicle === 'success' ? ':white_check_mark: Passed' : ':x: Failed'} |\n`;
-            summary += `| Multi Vehicle | ${multiVehicle === 'success' ? ':white_check_mark: Passed' : ':x: Failed'} |\n\n`;
+            summary += '| Test Suite | Status | Total | Passed | Warnings | Failed |\n';
+            summary += '|------------|--------|-------|--------|----------|--------|\n';
+            summary += `| Single Vehicle | ${singleVehicle === 'success' ? ':white_check_mark: Passed' : ':x: Failed'} | ${{ needs.test-single-vehicle.outputs.total_tests }} | ${{ needs.test-single-vehicle.outputs.passed }} | ${{ needs.test-single-vehicle.outputs.passed_with_warnings }} | ${{ needs.test-single-vehicle.outputs.failed }} |\n`;
+            summary += `| Multi Vehicle | ${multiVehicle === 'success' ? ':white_check_mark: Passed' : ':x: Failed'} | ${{ needs.test-multi-vehicle.outputs.total_tests }} | ${{ needs.test-multi-vehicle.outputs.passed }} | ${{ needs.test-multi-vehicle.outputs.passed_with_warnings }} | ${{ needs.test-multi-vehicle.outputs.failed }} |\n\n`;
 
-            if (singleVehicle === 'success' && multiVehicle === 'success') {
+            summary += `ALLOW_PR_CI_TEST_BYPASS: ${bypassRaw}\n\n`;
+
+            if (allPassed) {
               summary += ':tada: All tests passed! This PR is ready for review.\n';
+            } else if (bypass) {
+              summary += ':warning: Some tests failed, ALLOW_PR_CI_TEST_BYPASS is TRUE, the PR check passes. This PR is ready for review.\n';
             } else {
               summary += ':warning: Some tests failed. Please review the test reports in the workflow artifacts.\n';
             }
@@ -256,10 +335,21 @@ jobs:
 
       - name: Set PR status
         run: |
-          if [ "${{ needs.test-single-vehicle.result }}" == "success" ] && [ "${{ needs.test-multi-vehicle.result }}" == "success" ]; then
-            echo "All tests passed!"
-            exit 0
+          bypass="${{ vars.ALLOW_PR_CI_TEST_BYPASS }}"
+          if [ -z "$bypass" ]; then
+              bypass="FALSE"
+          fi
+          # If bypass is TRUE, always pass
+          if [ "$bypass" == "TRUE" ]; then
+              echo "Bypass enabled - passing despite test results"
+              exit 0
+          fi
+          
+          # If bypass is FALSE, only pass if both jobs succeeded
+          if [ "$single_result" == "success" ] && [ "$multi_result" == "success" ]; then
+              echo "All tests passed!"
+              exit 0
           else
-            echo "Some tests failed!"
-            exit 1
+              echo "Some tests failed!"
+              exit 1
           fi
