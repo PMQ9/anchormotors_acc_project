@@ -5,11 +5,24 @@
 % -------------------------------------------------------------------------
 
 % === USER CONFIGURATION ===
-modelsFolder = fullfile(pwd, 'test', 'multi_veh_test/');
+% Use current directory as models folder (works when run from test/multi_veh_test/)
+% or fallback to the explicit path if run from project root
+if contains(pwd, 'multi_veh_test')
+    modelsFolder = pwd;
+else
+    modelsFolder = fullfile(pwd, 'test', 'multi_veh_test/');
+end
 
 % Add project root and all subdirectories to path
-addpath(genpath(pwd));
-fprintf('Added project paths from: %s\n', pwd);
+if contains(pwd, 'multi_veh_test')
+    % Go up two levels to project root
+    projectRoot = fullfile(pwd, '..', '..');
+    addpath(genpath(projectRoot));
+    fprintf('Added project paths from: %s\n', projectRoot);
+else
+    addpath(genpath(pwd));
+    fprintf('Added project paths from: %s\n', pwd);
+end
 
 searchSubfolders = false;                  % set false for top-level only
 closeAfterSim = false;                     % close models after running
