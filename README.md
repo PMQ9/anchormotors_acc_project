@@ -4,7 +4,12 @@
 
 ## Requirements
 - MATLAB 2025a
-- MATLAB Report Generator toolbox
+- Required Toolboxes:
+  - Simulink
+  - MATLAB Report Generator
+  - Control System Toolbox
+  - Simulink Control Design
+  - DSP System Toolbox
 
 ## Automated Testing
 

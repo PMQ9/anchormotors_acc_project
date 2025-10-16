@@ -40,6 +40,12 @@ jobs:
         uses: matlab-actions/setup-matlab@v2
         with:
           release: R2025a
+          products: |
+            Simulink
+            MATLAB_Report_Generator
+            Control_System_Toolbox
+            Simulink_Control_Design
+            DSP_System_Toolbox
 
       - name: Run Single Vehicle Tests
         id: single_vehicle_tests
@@ -174,6 +180,12 @@ jobs:
         uses: matlab-actions/setup-matlab@v2
         with:
           release: R2025a
+          products: |
+            Simulink
+            MATLAB_Report_Generator
+            Control_System_Toolbox
+            Simulink_Control_Design
+            DSP_System_Toolbox
 
       - name: Run Multi Vehicle Tests
         id: multi_vehicle_tests
