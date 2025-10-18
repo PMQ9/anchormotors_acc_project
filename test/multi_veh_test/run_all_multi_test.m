@@ -353,7 +353,7 @@ function plotFile = generatePlotsFromSimulation(simOut, modelName, outputFolder)
             % Get all property names from simOut
             if isobject(simOut)
                 props = properties(simOut);
-                fprintf('DEBUG: Found %d properties in simOut\n', length(props));
+                % fprintf('DEBUG: Found %d properties in simOut\n', length(props));
                 for i = 1:length(props)
                     propName = props{i};
                     % Skip known non-data properties
@@ -367,13 +367,13 @@ function plotFile = generatePlotsFromSimulation(simOut, modelName, outputFolder)
                         if isa(propData, 'timeseries')
                             dataToPlot{end+1} = struct('time', propData.Time, 'data', propData.Data);
                             dataNames{end+1} = propName;
-                            fprintf('DEBUG: Added timeseries %s\n', propName);
+                            % fprintf('DEBUG: Added timeseries %s\n', propName);
                         elseif isstruct(propData) && isfield(propData, 'time') && isfield(propData, 'signals')
                             % Structure with Time format from To Workspace
                             % Squeeze to remove singleton dimensions (handles 3D data like [1 1 56])
                             dataToPlot{end+1} = struct('time', squeeze(propData.time), 'data', squeeze(propData.signals.values));
                             dataNames{end+1} = propName;
-                            fprintf('DEBUG: Added struct %s\n', propName);
+                            % fprintf('DEBUG: Added struct %s\n', propName);
                         end
                     catch
                         % Skip if we can't process this property
