@@ -3,7 +3,7 @@
 # User Manual
 
 ## Requirements
-- MATLAB 2025a
+- MATLAB 2025b
 - Required Toolboxes:
   - Simulink
   - MATLAB Report Generator

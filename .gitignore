@@ -7,4 +7,6 @@ test/single_veh_test/results/*.txt
 test/single_veh_test/results/*.png
 test/multi_veh_test/results/*.txt
 test/multi_veh_test/results/*.png
+test/multi_veh_test/results/*.pdf
+test/multi_veh_test/results/*.pdf
 slprj/
