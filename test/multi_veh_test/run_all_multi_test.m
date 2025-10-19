@@ -5,11 +5,24 @@
 % -------------------------------------------------------------------------
 
 % === USER CONFIGURATION ===
-modelsFolder = fullfile(pwd, 'test', 'multi_veh_test/');
+% Use current directory as models folder (works when run from test/multi_veh_test/)
+% or fallback to the explicit path if run from project root
+if contains(pwd, 'multi_veh_test')
+    modelsFolder = pwd;
+else
+    modelsFolder = fullfile(pwd, 'test', 'multi_veh_test/');
+end
 
 % Add project root and all subdirectories to path
-addpath(genpath(pwd));
-fprintf('Added project paths from: %s\n', pwd);
+if contains(pwd, 'multi_veh_test')
+    % Go up two levels to project root
+    projectRoot = fullfile(pwd, '..', '..');
+    addpath(genpath(projectRoot));
+    fprintf('Added project paths from: %s\n', projectRoot);
+else
+    addpath(genpath(pwd));
+    fprintf('Added project paths from: %s\n', pwd);
+end
 
 searchSubfolders = false;                  % set false for top-level only
 closeAfterSim = false;                     % close models after running
@@ -106,6 +119,17 @@ for k = 1:numel(modelFiles)
 
     catch ME
         fprintf(2, 'Error running model "%s": %s\n', modelName, ME.message);
+        fprintf(2, 'Error identifier: %s\n', ME.identifier);
+
+        % Print detailed cause information
+        if ~isempty(ME.cause)
+            fprintf(2, 'Error has %d cause(s):\n', length(ME.cause));
+            for causeIdx = 1:length(ME.cause)
+                fprintf(2, '  Cause %d: %s\n', causeIdx, ME.cause{causeIdx}.message);
+                fprintf(2, '  Identifier: %s\n', ME.cause{causeIdx}.identifier);
+            end
+        end
+
         % Store critical simulation error
         errorType = sprintf('Simulation Error: %s', ME.message);
         testCase.errorTypes(errorType) = struct('count', 1, 'firstOccurrence', errorType);
