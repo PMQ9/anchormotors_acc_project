@@ -10,3 +10,4 @@ test/multi_veh_test/results/*.png
 test/multi_veh_test/results/*.pdf
 test/multi_veh_test/results/*.pdf
 slprj/
+*.bag
