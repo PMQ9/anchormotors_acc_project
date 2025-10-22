@@ -23,7 +23,7 @@ jobs:
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
-          release: R2025a
+          release: R2025b
           products: |
             Simulink
             MATLAB_Report_Generator
@@ -134,6 +134,7 @@ jobs:
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
+          release: R2025b
           release: R2025a
           products: |
             Simulink
