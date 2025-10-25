@@ -348,6 +348,8 @@ jobs:
       - name: Set PR status
         run: |
           bypass="${{ vars.ALLOW_PR_CI_TEST_BYPASS }}"
+          single_result="${{ needs.test-single-vehicle.result }}"
+          multi_result="${{ needs.test-multi-vehicle.result }}"
           if [ -z "$bypass" ]; then
               bypass="FALSE"
           fi
