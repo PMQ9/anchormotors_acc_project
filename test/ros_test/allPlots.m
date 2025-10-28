@@ -8,13 +8,9 @@ cmd_accel   = timeseries(select(bag,'Topic','/egocar/cmd_accel'));
 rel_vel     = timeseries(select(bag,'Topic','/egocar/rel_vel'));
 lead_dist   = timeseries(select(bag,'Topic','/egocar/lead_dist'));
 lead_vel_x  = timeseries(select(bag,'Topic','/leadcar/car/state/vel_x'));
-ego_mode    = timeseries(select(bag,'Topic','/egocar/acc_mode'));
+ego_mode    = timeseries(select(bag,'Topic','/egocar/acc_mode')); % used for coloring
 
-% Time t0
-t0 = vel_x.Time(1);
-
-% Create figure with subplots
-figure;
+% List of topics
 topics = {vel_x, cmd_accel, rel_vel, lead_dist, lead_vel_x, ego_mode};
 titles = { ...
     'Ego Velocity X (m/s)', ...
@@ -27,18 +23,42 @@ titles = { ...
 
 numPlots = numel(topics);
 
+% Match mode timestamps to each topic by interpolation
+modeTime = ego_mode.Time;
+modeData = ego_mode.Data;
+uniqueModes = unique(modeData);
+numModes = length(uniqueModes);
+colors = lines(numModes); % distinct colors for each mode
+
+figure;
+
 for i = 1:numPlots
     subplot(numPlots,1,i);
-    plot(topics{i}.Time - t0, topics{i}.Data, '.');
+    hold on;
+    
+    % Interpolate mode values for current topic timestamps
+    topicTime = topics{i}.Time;
+    topicData = topics{i}.Data;
+    modeInterp = interp1(modeTime, modeData, topicTime, 'nearest', 'extrap');
+
+    % Plot each segment in its mode color
+    for m = 1:numModes
+        idx = modeInterp == uniqueModes(m);
+        scatter(topicTime(idx), topicData(idx), 12, colors(m,:), 'filled');
+    end
+
     title(titles{i});
     ylabel('Value');
+    grid on;
     if i == numPlots
         xlabel('Time (s)');
     else
-        set(gca, 'XTickLabel', []); % Hide x labels except last
+        set(gca, 'XTickLabel', []);
     end
-    grid on;
+    hold off;
 end
 
-sgtitle('ROS Bag Timeseries by Topic');
+legendStrings = "Mode " + string(uniqueModes);
+legend(legendStrings, 'Location', 'bestoutside');
+sgtitle('ROS Bag Timeseries by Topic - Colored by ACC Mode');
 fontsize(gcf,"scale",1.4)
