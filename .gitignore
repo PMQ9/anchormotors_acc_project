@@ -11,3 +11,9 @@ test/multi_veh_test/results/*.pdf
 test/multi_veh_test/results/*.pdf
 slprj/
 *.bag
+
+# ros generated files
+anchormotors_ert_rtw/*
+src/anchormotors/include/*
+src/anchormotors/src/*
+src/*
