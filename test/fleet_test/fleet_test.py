@@ -235,8 +235,10 @@ class FleetSimulation:
             lead_vehicle_profile: Function that returns lead vehicle velocity at time t
                                   If None, lead vehicle maintains constant speed
         """
-        # Lead vehicle (index -1) starts ahead of all others
-        lead_position = self.n_vehicles * 50.0
+        # Lead vehicle starts one spacing interval ahead of the last vehicle
+        initial_velocity = 20.0
+        initial_spacing = 10.0 + 2.5 * initial_velocity  # Match initialization spacing
+        lead_position = self.n_vehicles * initial_spacing
         lead_velocity = 20.0
 
         for step in range(self.steps):
