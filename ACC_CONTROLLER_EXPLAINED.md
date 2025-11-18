@@ -107,7 +107,7 @@ The controller uses a **5-state finite state machine** to handle different traff
 All control laws follow the general form of **Intelligent Driver Model (IDM)**-style control:
 
 ```
-cmd_accel = α * (d_actual - d_desired - τ * v_rel) + β * v_ego
+cmd_accel = α * (d_actual - d_desired - τ * v_ego) + β * v_rel
 ```
 
 Where:
@@ -151,7 +151,7 @@ cmd_accel = vel_limiter * distance_accel_sat
 Aggressive controller for catching up to slower traffic.
 
 ```c++
-cmd_accel = ((lead_dist - 10.0) - 2.4 * rel_vel) * 0.7 + 0.23 * ego_vel
+cmd_accel = ((lead_dist - 10.0) - 2.4 * ego_vel) * 0.7 + 0.23 * rel_vel
 ```
 
 **Parameters:**
@@ -169,7 +169,7 @@ cmd_accel = ((lead_dist - 10.0) - 2.4 * rel_vel) * 0.7 + 0.23 * ego_vel
 Conservative controller for stable car-following.
 
 ```c++
-cmd_accel = ((lead_dist - 10.0) - 2.5 * rel_vel) * 0.2 + 0.35 * ego_vel
+cmd_accel = ((lead_dist - 10.0) - 2.5 * rel_ego) * 0.2 + 0.35 * rel_vel
 cmd_accel = clamp(cmd_accel, -3.0, 1.5)
 ```
 
@@ -189,7 +189,7 @@ cmd_accel = clamp(cmd_accel, -3.0, 1.5)
 Very aggressive controller for accelerating away from traffic.
 
 ```c++
-cmd_accel = ((lead_dist - 10.0) - 2.4 * rel_vel) * 1.1 + 0.24 * ego_vel
+cmd_accel = ((lead_dist - 10.0) - 2.4 * ego_vel) * 1.1 + 0.24 * rel_vel
 ```
 
 **Parameters:**
