@@ -11,10 +11,16 @@ This directory contains a Python implementation of the Anchormotors ACC controll
   - Moving average filters, low-pass filtering, and saturation
 
 - **[fleet_test.py](fleet_test.py)** - Fleet simulation and penetration rate testing
-  - Simulates platoons of vehicles with mixed ACC/human drivers
+  - Simulates platoons of 25 vehicles with mixed ACC/human drivers
+  - Tests penetration rates: 5%, 10%, 20%, 50%, 75%, 100%
   - Human driver model based on Intelligent Driver Model (IDM)
   - Comprehensive visualization and metrics
   - Compares different penetration rates
+
+- **[run_25_vehicle_test.py](run_25_vehicle_test.py)** - Quick runner for 25-vehicle fleet test
+  - Runs both constant and oscillating lead vehicle scenarios
+  - Prints summary comparison tables
+  - Focused on string stability and safety metrics
 
 ### Requirements
 
@@ -33,16 +39,22 @@ python acc_controller.py
 
 This runs a simple test scenario and generates a plot showing the controller behavior.
 
-#### Run Fleet Test
+#### Run Fleet Test (25 Vehicles)
 
 ```bash
 cd test/fleet_test
 python fleet_test.py
 ```
 
-This runs comprehensive fleet simulations comparing different ACC penetration rates:
-- **Scenario 1**: Constant lead vehicle speed
-- **Scenario 2**: Oscillating lead vehicle speed
+This runs comprehensive fleet simulations with **25 vehicles** comparing different ACC penetration rates:
+- **Penetration rates tested**: 5%, 10%, 20%, 50%, 75%, 100%
+- **Scenario 1**: Constant lead vehicle speed (20 m/s)
+- **Scenario 2**: Oscillating lead vehicle speed (15-25 m/s)
+
+**Quick runner**:
+```bash
+python run_25_vehicle_test.py
+```
 
 Results are saved to `test/fleet_test/results/`
 

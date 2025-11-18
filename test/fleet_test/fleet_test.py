@@ -6,6 +6,8 @@ Compares ACC behavior against human driver model.
 """
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from acc_controller import ACCController, ACCParameters, ACCState
@@ -288,7 +290,15 @@ class FleetSimulation:
         ax1.set_title(f'Fleet Simulation - {self.penetration_rate*100:.0f}% ACC Penetration Rate ({self.n_vehicles} vehicles)',
                      fontsize=14, fontweight='bold')
         ax1.grid(True, alpha=0.3)
-        ax1.legend(labels, ncol=min(self.n_vehicles, 6), fontsize=8)
+        # Only show legend if <= 10 vehicles, otherwise just show color code
+        if self.n_vehicles <= 10:
+            ax1.legend(labels, ncol=min(self.n_vehicles, 6), fontsize=8)
+        else:
+            # Create simple legend for color coding only
+            from matplotlib.patches import Patch
+            legend_elements = [Patch(facecolor='blue', label='ACC vehicles'),
+                             Patch(facecolor='red', label='Human drivers')]
+            ax1.legend(handles=legend_elements, fontsize=10)
 
         # 2. Space Gap vs Time
         ax2 = fig.add_subplot(gs[1, :])
@@ -323,14 +333,16 @@ class FleetSimulation:
         acc_indices = [i for i, v in enumerate(self.vehicles) if v.is_acc]
         if acc_indices:
             for i in acc_indices:
-                ax5.plot(self.time, self.states[:, i], label=f'V{i}', linewidth=1.5)
+                ax5.plot(self.time, self.states[:, i], label=f'V{i}', linewidth=1.5, alpha=0.7)
             ax5.set_ylabel('ACC State', fontsize=12)
             ax5.set_xlabel('Time (s)', fontsize=12)
             ax5.set_yticks([0, 1, 2, 3])
             ax5.set_yticklabels(['No Wave', 'Into Wave', 'In Wave', 'Out Wave'], fontsize=9)
             ax5.grid(True, alpha=0.3)
-            ax5.legend(fontsize=8)
-            ax5.set_title('ACC Vehicle States', fontsize=12)
+            # Only show legend if <= 8 ACC vehicles
+            if len(acc_indices) <= 8:
+                ax5.legend(fontsize=8, ncol=2)
+            ax5.set_title(f'ACC Vehicle States ({len(acc_indices)} vehicles)', fontsize=12)
         else:
             ax5.text(0.5, 0.5, 'No ACC vehicles', ha='center', va='center', fontsize=14)
             ax5.set_xlabel('Time (s)', fontsize=12)
@@ -372,9 +384,11 @@ class FleetSimulation:
 
         if filename:
             plt.savefig(filename, dpi=150, bbox_inches='tight')
-            print(f"Plot saved to {filename}")
+            print(f"  -> Plot saved to {filename}")
+        else:
+            print("  WARNING: No filename provided, plot not saved")
 
-        plt.show()
+        plt.close(fig)  # Close figure to free memory
 
     def calculate_metrics(self) -> dict:
         """
@@ -431,8 +445,9 @@ def compare_penetration_rates(n_vehicles: int = 8,
     """
     results = {}
 
-    # Create output directory
-    output_dir = 'test/fleet_test/results'
+    # Create output directory relative to this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_dir = os.path.join(script_dir, 'results')
     os.makedirs(output_dir, exist_ok=True)
 
     # Run simulations for each penetration rate
@@ -517,38 +532,45 @@ def _plot_comparison(results: dict, output_dir: str):
 
     filename = f"{output_dir}/penetration_rate_comparison.png"
     plt.savefig(filename, dpi=150, bbox_inches='tight')
-    print(f"\nComparison plot saved to {filename}")
-    plt.show()
+    print(f"  -> Comparison plot saved to {filename}")
+    plt.close()  # Close figure to free memory
 
 
 if __name__ == "__main__":
     """Run fleet test with various scenarios"""
 
+    # Configuration
+    N_VEHICLES = 25
+    PENETRATION_RATES = [0.05, 0.10, 0.20, 0.50, 0.75, 1.0]
+    DURATION = 100.0
+
     # Scenario 1: Lead vehicle maintains constant speed
     print("\n" + "="*70)
-    print("SCENARIO 1: Constant Lead Vehicle Speed")
+    print(f"SCENARIO 1: Constant Lead Vehicle Speed ({N_VEHICLES} vehicles)")
     print("="*70)
+    print(f"Testing penetration rates: {[f'{r*100:.0f}%' for r in PENETRATION_RATES]}")
 
     compare_penetration_rates(
-        n_vehicles=8,
-        penetration_rates=[0.0, 0.25, 0.5, 0.75, 1.0],
-        duration=100.0,
+        n_vehicles=N_VEHICLES,
+        penetration_rates=PENETRATION_RATES,
+        duration=DURATION,
         lead_vehicle_profile=lambda t: 20.0  # Constant 20 m/s
     )
 
     # Scenario 2: Lead vehicle with speed oscillations
     print("\n" + "="*70)
-    print("SCENARIO 2: Oscillating Lead Vehicle Speed")
+    print(f"SCENARIO 2: Oscillating Lead Vehicle Speed ({N_VEHICLES} vehicles)")
     print("="*70)
+    print(f"Testing penetration rates: {[f'{r*100:.0f}%' for r in PENETRATION_RATES]}")
 
     def oscillating_profile(t):
         """Lead vehicle oscillates between 15-25 m/s"""
         return 20.0 + 5.0 * np.sin(2 * np.pi * t / 20.0)
 
     compare_penetration_rates(
-        n_vehicles=8,
-        penetration_rates=[0.0, 0.5, 1.0],
-        duration=100.0,
+        n_vehicles=N_VEHICLES,
+        penetration_rates=PENETRATION_RATES,
+        duration=DURATION,
         lead_vehicle_profile=oscillating_profile
     )
 
