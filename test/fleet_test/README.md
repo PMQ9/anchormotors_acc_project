@@ -21,18 +21,57 @@ This directory contains a Python implementation of the Anchormotors ACC controll
 ### Requirements
 
 ```bash
-pip install numpy matplotlib
+pip install -r requirements.txt
+# or manually:
+pip install numpy matplotlib reportlab
 ```
 
 ### Quick Start
+
+#### Option 1: Run Comprehensive Test Suite (Recommended)
+
+**Windows:**
+```bash
+cd test/fleet_test
+run_full_fleet_test.bat
+```
+
+**Linux/Mac:**
+```bash
+cd test/fleet_test
+chmod +x run_full_fleet_test.sh
+./run_full_fleet_test.sh
+```
+
+**Python:**
+```bash
+cd test/fleet_test
+python full_fleet_test.py
+```
+
+This runs **15+ comprehensive scenarios** with **25 vehicles** each, testing multiple ACC penetration rates (5%, 10%, 20%, 50%, 75%, 100%). Generates a complete PDF report with all results.
+
+**Scenarios tested:**
+1. Different constant speeds (3 scenarios)
+2. Oscillation patterns (4 scenarios)
+3. Sudden acceleration (2 scenarios)
+4. Sudden deceleration (3 scenarios - safety critical)
+5. Step changes/state oscillations (3 scenarios)
+
+**Runtime:** ~10-20 minutes depending on system performance
+
+**Outputs:**
+- Individual plots for each scenario and penetration rate (~90 PNG files)
+- Comprehensive PDF report (`fleet_test_comprehensive_report.pdf`)
+
+#### Option 2: Run Basic Fleet Test
 
 ```bash
 cd test/fleet_test
 python fleet_test.py
 ```
 
-This runs comprehensive fleet simulations with **25 vehicles** comparing different ACC penetration rates:
-- **Penetration rates tested**: 5%, 10%, 20%, 50%, 75%, 100%
+This runs 2 basic scenarios:
 - **Scenario 1**: Constant lead vehicle speed (20 m/s)
 - **Scenario 2**: Oscillating lead vehicle speed (15-25 m/s)
 

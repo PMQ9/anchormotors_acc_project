@@ -13,6 +13,14 @@ from matplotlib.gridspec import GridSpec
 from acc_controller import ACCController, ACCParameters, ACCState
 from typing import List, Tuple
 import os
+from typing import List, Tuple, Dict, Callable
+import os
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Image, Paragraph, Spacer, PageBreak, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from datetime import datetime
 
 
 class HumanDriver:
@@ -432,10 +440,66 @@ class FleetSimulation:
         return var_end / var_start
 
 
+# ============================================================================
+# Lead Vehicle Profile Functions for Different Test Scenarios
+# ============================================================================
+
+def constant_speed_profile(speed: float):
+    """Create a constant speed profile"""
+    return lambda t: speed
+
+def oscillating_profile(base_speed: float, amplitude: float, period: float):
+    """Create an oscillating speed profile"""
+    return lambda t: base_speed + amplitude * np.sin(2 * np.pi * t / period)
+
+def sudden_acceleration_profile(initial_speed: float, final_speed: float, accel_time: float):
+    """Create a profile with sudden acceleration at t=20s"""
+    def profile(t):
+        if t < 20.0:
+            return initial_speed
+        elif t < 20.0 + accel_time:
+            # Linear acceleration
+            progress = (t - 20.0) / accel_time
+            return initial_speed + (final_speed - initial_speed) * progress
+        else:
+            return final_speed
+    return profile
+
+def sudden_deceleration_profile(initial_speed: float, final_speed: float, decel_time: float):
+    """Create a profile with sudden deceleration at t=20s"""
+    def profile(t):
+        if t < 20.0:
+            return initial_speed
+        elif t < 20.0 + decel_time:
+            # Linear deceleration
+            progress = (t - 20.0) / decel_time
+            return initial_speed + (final_speed - initial_speed) * progress
+        else:
+            return final_speed
+    return profile
+
+def step_change_profile(speeds: List[float], step_duration: float):
+    """Create a profile with step changes in velocity"""
+    def profile(t):
+        step_index = int(t / step_duration) % len(speeds)
+        return speeds[step_index]
+    return profile
+
+def multi_oscillation_profile(base_speed: float):
+    """Create a complex profile with multiple oscillation frequencies"""
+    def profile(t):
+        # Combine multiple frequencies for complex behavior
+        slow_osc = 3.0 * np.sin(2 * np.pi * t / 40.0)  # 40s period
+        fast_osc = 2.0 * np.sin(2 * np.pi * t / 10.0)  # 10s period
+        return base_speed + slow_osc + fast_osc
+    return profile
+
+
 def compare_penetration_rates(n_vehicles: int = 8,
                               penetration_rates: List[float] = [0.0, 0.25, 0.5, 0.75, 1.0],
                               duration: float = 100.0,
-                              lead_vehicle_profile=None):
+                              lead_vehicle_profile=None,
+                              scenario_name: str = "scenario"):
     """
     Compare fleet behavior at different ACC penetration rates
 
@@ -467,7 +531,7 @@ def compare_penetration_rates(n_vehicles: int = 8,
         sim.run(lead_vehicle_profile=lead_vehicle_profile)
 
         # Plot results
-        filename = f"{output_dir}/fleet_test_penetration_{int(rate*100):03d}.png"
+        filename = f"{output_dir}/{scenario_name}_penetration_{int(rate*100):03d}.png"
         sim.plot_results(filename=filename)
 
         # Calculate metrics
@@ -479,12 +543,12 @@ def compare_penetration_rates(n_vehicles: int = 8,
             print(f"  {key}: {value:.4f}")
 
     # Create comparison plot
-    _plot_comparison(results, output_dir)
+    _plot_comparison(results, output_dir, scenario_name)
 
     return results
 
 
-def _plot_comparison(results: dict, output_dir: str):
+def _plot_comparison(results: dict, output_dir: str, scenario_name: str = "scenario"):
     """Create comparison plots across penetration rates"""
 
     rates = sorted(results.keys())
@@ -536,10 +600,154 @@ def _plot_comparison(results: dict, output_dir: str):
     plt.suptitle('ACC Penetration Rate Impact on Fleet Performance', fontsize=14, fontweight='bold')
     plt.tight_layout()
 
-    filename = f"{output_dir}/penetration_rate_comparison.png"
+    filename = f"{output_dir}/{scenario_name}_comparison.png"
     plt.savefig(filename, dpi=150, bbox_inches='tight')
     print(f"  -> Comparison plot saved to {filename}")
     plt.close()  # Close figure to free memory
+
+
+def generate_pdf_report(output_dir: str, scenarios: Dict[str, dict]):
+    """
+    Generate a comprehensive PDF report with all test results
+
+    Args:
+        output_dir: Directory containing the result plots
+        scenarios: Dictionary mapping scenario names to their descriptions
+    """
+    pdf_filename = f"{output_dir}/fleet_test_comprehensive_report.pdf"
+
+    doc = SimpleDocTemplate(pdf_filename, pagesize=letter,
+                           topMargin=0.5*inch, bottomMargin=0.5*inch,
+                           leftMargin=0.5*inch, rightMargin=0.5*inch)
+
+    story = []
+    styles = getSampleStyleSheet()
+
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#1f77b4'),
+        spaceAfter=30,
+        alignment=1  # Center
+    )
+
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=colors.HexColor('#2c3e50'),
+        spaceAfter=12,
+        spaceBefore=12
+    )
+
+    # Title page
+    story.append(Spacer(1, 1.5*inch))
+    story.append(Paragraph("Fleet Test Comprehensive Report", title_style))
+    story.append(Spacer(1, 0.3*inch))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                          styles['Normal']))
+    story.append(Spacer(1, 0.5*inch))
+
+    # Executive Summary
+    story.append(Paragraph("Executive Summary", heading_style))
+    summary_text = """
+    This report presents comprehensive fleet test results for the Anchormotors ACC (Adaptive Cruise Control) system.
+    The tests evaluate fleet behavior under various scenarios including different lead vehicle speeds,
+    oscillations, sudden accelerations/decelerations, and state changes. Each scenario is tested across
+    multiple ACC penetration rates to understand the impact of ACC-equipped vehicles on overall fleet performance.
+    """
+    story.append(Paragraph(summary_text, styles['BodyText']))
+    story.append(Spacer(1, 0.3*inch))
+
+    # Test Configuration
+    story.append(Paragraph("Test Configuration", heading_style))
+    config_data = [
+        ['Parameter', 'Value'],
+        ['Number of Vehicles', '25'],
+        ['Simulation Duration', '100 seconds'],
+        ['Time Step', '0.05 seconds'],
+        ['Penetration Rates Tested', '5%, 10%, 20%, 50%, 75%, 100%'],
+        ['Initial Velocity', '20 m/s'],
+        ['Initial Spacing', '~60 m (equilibrium)']
+    ]
+    config_table = Table(config_data, colWidths=[3*inch, 3*inch])
+    config_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(config_table)
+    story.append(PageBreak())
+
+    # Table of Contents
+    story.append(Paragraph("Test Scenarios", heading_style))
+    story.append(Spacer(1, 0.2*inch))
+
+    toc_data = [['#', 'Scenario Name', 'Description']]
+    for idx, (scenario_name, scenario_info) in enumerate(scenarios.items(), 1):
+        toc_data.append([str(idx), scenario_name, scenario_info['description']])
+
+    toc_table = Table(toc_data, colWidths=[0.5*inch, 2*inch, 4*inch])
+    toc_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP')
+    ]))
+    story.append(toc_table)
+    story.append(PageBreak())
+
+    # Add each scenario's results
+    for idx, (scenario_name, scenario_info) in enumerate(scenarios.items(), 1):
+        # Scenario header
+        story.append(Paragraph(f"Scenario {idx}: {scenario_name}", heading_style))
+        story.append(Paragraph(f"<i>{scenario_info['description']}</i>", styles['BodyText']))
+        story.append(Spacer(1, 0.2*inch))
+
+        # Add comparison plot first (summary)
+        comparison_file = f"{output_dir}/{scenario_name}_comparison.png"
+        if os.path.exists(comparison_file):
+            img = Image(comparison_file, width=7*inch, height=4.67*inch)
+            story.append(img)
+            story.append(Spacer(1, 0.2*inch))
+
+        # Add detailed plots for each penetration rate
+        story.append(Paragraph(f"Detailed Results by Penetration Rate",
+                              ParagraphStyle('SubHeading', parent=styles['Heading3'],
+                                           fontSize=13, spaceAfter=10)))
+
+        penetration_rates = [5, 10, 20, 50, 75, 100]
+        for rate in penetration_rates:
+            detail_file = f"{output_dir}/{scenario_name}_penetration_{rate:03d}.png"
+            if os.path.exists(detail_file):
+                story.append(PageBreak())
+                story.append(Paragraph(f"{rate}% ACC Penetration",
+                                      ParagraphStyle('RateHeading', parent=styles['Heading4'],
+                                                   fontSize=12, spaceAfter=8)))
+                img = Image(detail_file, width=7*inch, height=5.25*inch)
+                story.append(img)
+
+        story.append(PageBreak())
+
+    # Build PDF
+    doc.build(story)
+    print(f"\n{'='*70}")
+    print(f"PDF Report Generated: {pdf_filename}")
+    print(f"{'='*70}\n")
+
+    return pdf_filename
 
 
 if __name__ == "__main__":
