@@ -200,9 +200,11 @@ class FleetSimulation:
         n_acc_vehicles = int(self.n_vehicles * self.penetration_rate)
         acc_indices = np.random.choice(self.n_vehicles, size=n_acc_vehicles, replace=False)
 
-        # Create vehicles (spaced 50m apart, all at 20 m/s initially)
-        initial_spacing = 50.0
+        # Create vehicles with equilibrium spacing
+        # Equilibrium gap = desired_distance + time_headway * velocity
+        # Using tau=2.5s (In Wave), v=20m/s: gap = 10 + 2.5*20 = 60m
         initial_velocity = 20.0
+        initial_spacing = 10.0 + 2.5 * initial_velocity  # ~60m equilibrium spacing
 
         for i in range(self.n_vehicles):
             is_acc = i in acc_indices
@@ -505,23 +507,27 @@ def _plot_comparison(results: dict, output_dir: str):
     summary = "Penetration Rate Comparison\n" + "="*40 + "\n\n"
     summary += "Key Observations:\n\n"
 
+    # Get min and max penetration rates
+    min_rate = min(rates)
+    max_rate = max(rates)
+
     # String stability comparison
-    stability_0 = results[0.0]['string_stability']
-    stability_100 = results[1.0]['string_stability']
+    stability_min = results[min_rate]['string_stability']
+    stability_max = results[max_rate]['string_stability']
     summary += f"String Stability:\n"
-    summary += f"  0% ACC: {stability_0:.3f}\n"
-    summary += f"  100% ACC: {stability_100:.3f}\n"
-    if stability_100 < stability_0:
-        summary += f"  → {((stability_0-stability_100)/stability_0*100):.1f}% improvement\n\n"
+    summary += f"  {min_rate*100:.0f}% ACC: {stability_min:.3f}\n"
+    summary += f"  {max_rate*100:.0f}% ACC: {stability_max:.3f}\n"
+    if stability_max < stability_min:
+        summary += f"  -> {((stability_min-stability_max)/stability_min*100):.1f}% improvement\n\n"
     else:
-        summary += f"  → {((stability_100-stability_0)/stability_0*100):.1f}% degradation\n\n"
+        summary += f"  -> {((stability_max-stability_min)/stability_min*100):.1f}% degradation\n\n"
 
     # Safety comparison
-    gap_0 = results[0.0]['min_space_gap']
-    gap_100 = results[1.0]['min_space_gap']
+    gap_min = results[min_rate]['min_space_gap']
+    gap_max = results[max_rate]['min_space_gap']
     summary += f"Minimum Space Gap:\n"
-    summary += f"  0% ACC: {gap_0:.2f} m\n"
-    summary += f"  100% ACC: {gap_100:.2f} m\n\n"
+    summary += f"  {min_rate*100:.0f}% ACC: {gap_min:.2f} m\n"
+    summary += f"  {max_rate*100:.0f}% ACC: {gap_max:.2f} m\n\n"
 
     axes[5].text(0.1, 0.9, summary, transform=axes[5].transAxes,
                 fontsize=10, verticalalignment='top', fontfamily='monospace',
@@ -543,6 +549,15 @@ if __name__ == "__main__":
     N_VEHICLES = 25
     PENETRATION_RATES = [0.05, 0.10, 0.20, 0.50, 0.75, 1.0]
     DURATION = 100.0
+
+    print("\n" + "="*70)
+    print("FLEET TEST CONFIGURATION")
+    print("="*70)
+    print(f"Vehicles: {N_VEHICLES}")
+    print(f"Penetration rates: {[f'{r*100:.0f}%' for r in PENETRATION_RATES]}")
+    print(f"Initial velocity: 20 m/s")
+    print(f"Initial spacing: ~60 m (equilibrium for In Wave state)")
+    print("="*70)
 
     # Scenario 1: Lead vehicle maintains constant speed
     print("\n" + "="*70)
