@@ -16,11 +16,7 @@ This directory contains a Python implementation of the Anchormotors ACC controll
   - Human driver model based on Intelligent Driver Model (IDM)
   - Comprehensive visualization and metrics
   - Compares different penetration rates
-
-- **[run_25_vehicle_test.py](run_25_vehicle_test.py)** - Quick runner for 25-vehicle fleet test
-  - Runs both constant and oscillating lead vehicle scenarios
-  - Prints summary comparison tables
-  - Focused on string stability and safety metrics
+  - Runs 2 scenarios: constant and oscillating lead vehicle
 
 ### Requirements
 
@@ -29,17 +25,6 @@ pip install numpy matplotlib
 ```
 
 ### Quick Start
-
-#### Test ACC Controller Alone
-
-```bash
-cd test/fleet_test
-python acc_controller.py
-```
-
-This runs a simple test scenario and generates a plot showing the controller behavior.
-
-#### Run Fleet Test (25 Vehicles)
 
 ```bash
 cd test/fleet_test
@@ -51,12 +36,7 @@ This runs comprehensive fleet simulations with **25 vehicles** comparing differe
 - **Scenario 1**: Constant lead vehicle speed (20 m/s)
 - **Scenario 2**: Oscillating lead vehicle speed (15-25 m/s)
 
-**Quick runner**:
-```bash
-python run_25_vehicle_test.py
-```
-
-Results are saved to `test/fleet_test/results/`
+All plots are saved automatically to `test/fleet_test/results/` (no interactive windows)
 
 ### ACC Controller Usage
 
