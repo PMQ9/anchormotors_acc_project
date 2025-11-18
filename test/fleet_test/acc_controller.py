@@ -261,11 +261,11 @@ class ACCController:
             vel_approach = 0.333 * vel_error_sat
             vel_limiter = min(vel_approach, 1.0)
 
-            # Distance-based acceleration
+            # Distance-based acceleration (Simulink formula structure)
             distance_accel = (
-                (lead_dist - self.params.desired_distance - self.params.tau_no_wave * rel_vel) *
-                self.params.alpha_no_wave +
-                self.params.beta_no_wave * ego_vel
+                self.params.alpha_no_wave * (lead_dist - self.params.desired_distance -
+                                              self.params.tau_no_wave * ego_vel) +
+                self.params.beta_no_wave * rel_vel
             )
             distance_accel_sat = self._clamp(distance_accel, self.params.max_decel, self.params.max_accel)
 
@@ -273,25 +273,28 @@ class ACCController:
             cmd_accel = vel_limiter * distance_accel_sat
 
         elif self.state == ACCState.INTO_WAVE:
+            # Simulink formula structure
             cmd_accel = (
-                (lead_dist - self.params.desired_distance - self.params.tau_into_wave * rel_vel) *
-                self.params.alpha_into_wave +
-                self.params.beta_into_wave * ego_vel
+                self.params.alpha_into_wave * (lead_dist - self.params.desired_distance -
+                                                self.params.tau_into_wave * ego_vel) +
+                self.params.beta_into_wave * rel_vel
             )
 
         elif self.state == ACCState.IN_WAVE:
+            # Simulink formula structure
             cmd_accel = (
-                (lead_dist - self.params.desired_distance - self.params.tau_in_wave * rel_vel) *
-                self.params.alpha_in_wave +
-                self.params.beta_in_wave * ego_vel
+                self.params.alpha_in_wave * (lead_dist - self.params.desired_distance -
+                                              self.params.tau_in_wave * ego_vel) +
+                self.params.beta_in_wave * rel_vel
             )
             cmd_accel = self._clamp(cmd_accel, self.params.max_decel, self.params.max_accel)
 
         elif self.state == ACCState.OUT_OF_WAVE:
+            # Simulink formula structure
             cmd_accel = (
-                (lead_dist - self.params.desired_distance - self.params.tau_out_wave * rel_vel) *
-                self.params.alpha_out_wave +
-                self.params.beta_out_wave * ego_vel
+                self.params.alpha_out_wave * (lead_dist - self.params.desired_distance -
+                                               self.params.tau_out_wave * ego_vel) +
+                self.params.beta_out_wave * rel_vel
             )
         else:
             cmd_accel = 0.0
