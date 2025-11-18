@@ -1,0 +1,557 @@
+"""
+Fleet Test for ACC Controller
+
+Tests different penetration rates of ACC-equipped vehicles in a platoon.
+Compares ACC behavior against human driver model.
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+from acc_controller import ACCController, ACCParameters, ACCState
+from typing import List, Tuple
+import os
+
+
+class HumanDriver:
+    """
+    Simple human driver model using Intelligent Driver Model (IDM)
+
+    This provides a baseline comparison for ACC performance.
+    """
+
+    def __init__(self, desired_velocity: float = 25.0,
+                 time_headway: float = 1.5,
+                 min_spacing: float = 5.0,
+                 max_accel: float = 1.0,
+                 comfortable_decel: float = 2.0,
+                 accel_exponent: float = 4.0):
+        """
+        Initialize human driver model
+
+        Args:
+            desired_velocity: Desired free-flow velocity (m/s)
+            time_headway: Desired time headway (s)
+            min_spacing: Minimum spacing (m)
+            max_accel: Maximum acceleration (m/s²)
+            comfortable_decel: Comfortable deceleration (m/s²)
+            accel_exponent: Acceleration exponent (typically 4)
+        """
+        self.v0 = desired_velocity
+        self.T = time_headway
+        self.s0 = min_spacing
+        self.a = max_accel
+        self.b = comfortable_decel
+        self.delta = accel_exponent
+
+        # Add some reaction delay
+        self.reaction_time = 0.2  # 200ms delay
+        self.delay_buffer = []
+
+    def step(self, lead_dist: float, rel_vel: float, ego_vel: float, dt: float) -> float:
+        """
+        Calculate acceleration using IDM
+
+        Args:
+            lead_dist: Distance to lead vehicle (m)
+            rel_vel: Relative velocity (lead - ego) (m/s)
+            ego_vel: Current velocity (m/s)
+            dt: Timestep (s)
+
+        Returns:
+            Commanded acceleration (m/s²)
+        """
+        # IDM equation
+        # a = a_max * [1 - (v/v0)^delta - (s*/s)^2]
+        # where s* = s0 + v*T + v*Δv / (2*sqrt(a*b))
+
+        # Free-flow acceleration
+        if ego_vel < 0.01:
+            ego_vel = 0.01  # Avoid division by zero
+
+        free_accel = 1.0 - (ego_vel / self.v0) ** self.delta
+
+        # Interaction term
+        approach_rate = -rel_vel  # Negative rel_vel means approaching
+        s_star = self.s0 + ego_vel * self.T + (ego_vel * approach_rate) / (2 * np.sqrt(self.a * self.b))
+
+        if lead_dist < 1.0:
+            lead_dist = 1.0  # Avoid division by zero
+
+        interaction_term = (s_star / lead_dist) ** 2
+
+        # Combined acceleration
+        accel = self.a * (free_accel - interaction_term)
+
+        # Clamp to reasonable limits
+        accel = max(-3.0, min(1.5, accel))
+
+        # Add reaction delay
+        self.delay_buffer.append(accel)
+        delay_steps = int(self.reaction_time / dt)
+        if len(self.delay_buffer) > delay_steps:
+            accel = self.delay_buffer.pop(0)
+        else:
+            accel = 0.0
+
+        return accel
+
+
+class Vehicle:
+    """Represents a single vehicle in the fleet"""
+
+    def __init__(self, vehicle_id: int, is_acc: bool, initial_position: float,
+                 initial_velocity: float, dt: float = 0.05,
+                 acc_params: ACCParameters = None):
+        """
+        Initialize vehicle
+
+        Args:
+            vehicle_id: Unique vehicle identifier
+            is_acc: True if ACC-equipped, False for human driver
+            initial_position: Initial position (m)
+            initial_velocity: Initial velocity (m/s)
+            dt: Simulation timestep (s)
+            acc_params: ACC parameters (if ACC-equipped)
+        """
+        self.id = vehicle_id
+        self.is_acc = is_acc
+        self.position = initial_position
+        self.velocity = initial_velocity
+        self.acceleration = 0.0
+        self.dt = dt
+
+        # Initialize controller or driver model
+        if is_acc:
+            self.controller = ACCController(params=acc_params, dt=dt)
+            self.state = ACCState.NO_WAVE
+        else:
+            self.driver = HumanDriver()
+            self.state = -1  # Human drivers don't have ACC states
+
+    def update(self, lead_vehicle=None):
+        """
+        Update vehicle state for one timestep
+
+        Args:
+            lead_vehicle: Lead vehicle object (None if no lead vehicle)
+        """
+        if lead_vehicle is None:
+            # No lead vehicle - cruise at desired speed
+            desired_speed = 25.0
+            self.acceleration = 0.5 * (desired_speed - self.velocity)
+            self.acceleration = max(-3.0, min(1.5, self.acceleration))
+        else:
+            # Calculate spacing and relative velocity
+            lead_dist = lead_vehicle.position - self.position
+            rel_vel = lead_vehicle.velocity - self.velocity
+
+            # Get acceleration command
+            if self.is_acc:
+                self.acceleration, self.state = self.controller.step(lead_dist, rel_vel, self.velocity)
+            else:
+                self.acceleration = self.driver.step(lead_dist, rel_vel, self.velocity, self.dt)
+
+        # Update velocity and position
+        self.velocity = max(0.0, self.velocity + self.acceleration * self.dt)
+        self.position = self.position + self.velocity * self.dt
+
+
+class FleetSimulation:
+    """Simulates a fleet of vehicles with mixed ACC penetration"""
+
+    def __init__(self, n_vehicles: int, penetration_rate: float,
+                 dt: float = 0.05, duration: float = 100.0,
+                 acc_params: ACCParameters = None):
+        """
+        Initialize fleet simulation
+
+        Args:
+            n_vehicles: Number of vehicles in fleet
+            penetration_rate: Fraction of ACC-equipped vehicles (0.0 to 1.0)
+            dt: Simulation timestep (s)
+            duration: Simulation duration (s)
+            acc_params: ACC parameters for ACC-equipped vehicles
+        """
+        self.n_vehicles = n_vehicles
+        self.penetration_rate = penetration_rate
+        self.dt = dt
+        self.duration = duration
+        self.steps = int(duration / dt)
+        self.acc_params = acc_params if acc_params is not None else ACCParameters()
+
+        # Initialize vehicles
+        self.vehicles = []
+        self._initialize_vehicles()
+
+        # Data storage
+        self.time = np.zeros(self.steps)
+        self.positions = np.zeros((self.steps, n_vehicles))
+        self.velocities = np.zeros((self.steps, n_vehicles))
+        self.accelerations = np.zeros((self.steps, n_vehicles))
+        self.space_gaps = np.zeros((self.steps, n_vehicles))
+        self.states = np.zeros((self.steps, n_vehicles))
+
+    def _initialize_vehicles(self):
+        """Initialize vehicle fleet with random ACC distribution"""
+        # Determine which vehicles have ACC
+        n_acc_vehicles = int(self.n_vehicles * self.penetration_rate)
+        acc_indices = np.random.choice(self.n_vehicles, size=n_acc_vehicles, replace=False)
+
+        # Create vehicles (spaced 50m apart, all at 20 m/s initially)
+        initial_spacing = 50.0
+        initial_velocity = 20.0
+
+        for i in range(self.n_vehicles):
+            is_acc = i in acc_indices
+            position = i * initial_spacing
+            vehicle = Vehicle(
+                vehicle_id=i,
+                is_acc=is_acc,
+                initial_position=position,
+                initial_velocity=initial_velocity,
+                dt=self.dt,
+                acc_params=self.acc_params
+            )
+            self.vehicles.append(vehicle)
+
+    def run(self, lead_vehicle_profile=None):
+        """
+        Run simulation
+
+        Args:
+            lead_vehicle_profile: Function that returns lead vehicle velocity at time t
+                                  If None, lead vehicle maintains constant speed
+        """
+        # Lead vehicle (index -1) starts ahead of all others
+        lead_position = self.n_vehicles * 50.0
+        lead_velocity = 20.0
+
+        for step in range(self.steps):
+            t = step * self.dt
+            self.time[step] = t
+
+            # Update lead vehicle
+            if lead_vehicle_profile is not None:
+                lead_velocity = lead_vehicle_profile(t)
+
+            lead_position += lead_velocity * self.dt
+
+            # Update all vehicles (from front to back)
+            for i in range(self.n_vehicles - 1, -1, -1):
+                # Get lead vehicle for this vehicle
+                if i == self.n_vehicles - 1:
+                    # Last vehicle follows the lead vehicle
+                    lead_veh = type('obj', (object,), {
+                        'position': lead_position,
+                        'velocity': lead_velocity
+                    })()
+                else:
+                    # Follow vehicle ahead in platoon
+                    lead_veh = self.vehicles[i + 1]
+
+                # Update vehicle
+                self.vehicles[i].update(lead_veh)
+
+                # Store data
+                self.positions[step, i] = self.vehicles[i].position
+                self.velocities[step, i] = self.vehicles[i].velocity
+                self.accelerations[step, i] = self.vehicles[i].acceleration
+                self.states[step, i] = self.vehicles[i].state
+
+                # Calculate space gap
+                if i == self.n_vehicles - 1:
+                    self.space_gaps[step, i] = lead_position - self.vehicles[i].position
+                else:
+                    self.space_gaps[step, i] = self.vehicles[i + 1].position - self.vehicles[i].position
+
+    def plot_results(self, filename: str = None):
+        """
+        Create comprehensive visualization of fleet behavior
+
+        Args:
+            filename: Filename to save plot (if None, just display)
+        """
+        fig = plt.figure(figsize=(16, 12))
+        gs = GridSpec(5, 2, figure=fig, hspace=0.3, wspace=0.3)
+
+        # Color scheme: ACC vehicles in blue, human in red
+        colors = ['blue' if v.is_acc else 'red' for v in self.vehicles]
+        labels = [f'V{i} (ACC)' if v.is_acc else f'V{i} (Human)'
+                  for i, v in enumerate(self.vehicles)]
+
+        # 1. Position vs Time
+        ax1 = fig.add_subplot(gs[0, :])
+        for i in range(self.n_vehicles):
+            ax1.plot(self.time, self.positions[:, i], color=colors[i], alpha=0.7, linewidth=1.5)
+        ax1.set_ylabel('Position (m)', fontsize=12)
+        ax1.set_title(f'Fleet Simulation - {self.penetration_rate*100:.0f}% ACC Penetration Rate ({self.n_vehicles} vehicles)',
+                     fontsize=14, fontweight='bold')
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(labels, ncol=min(self.n_vehicles, 6), fontsize=8)
+
+        # 2. Space Gap vs Time
+        ax2 = fig.add_subplot(gs[1, :])
+        for i in range(self.n_vehicles):
+            ax2.plot(self.time, self.space_gaps[:, i], color=colors[i], alpha=0.7, linewidth=1.5)
+        ax2.axhline(y=10.0, color='green', linestyle='--', label='Desired gap (10m)', linewidth=2)
+        ax2.axhline(y=5.0, color='orange', linestyle='--', label='Min safe gap (5m)', linewidth=2)
+        ax2.set_ylabel('Space Gap (m)', fontsize=12)
+        ax2.grid(True, alpha=0.3)
+        ax2.legend(fontsize=8)
+
+        # 3. Velocity vs Time
+        ax3 = fig.add_subplot(gs[2, :])
+        for i in range(self.n_vehicles):
+            ax3.plot(self.time, self.velocities[:, i], color=colors[i], alpha=0.7, linewidth=1.5)
+        ax3.set_ylabel('Velocity (m/s)', fontsize=12)
+        ax3.grid(True, alpha=0.3)
+
+        # 4. Acceleration vs Time
+        ax4 = fig.add_subplot(gs[3, :])
+        for i in range(self.n_vehicles):
+            ax4.plot(self.time, self.accelerations[:, i], color=colors[i], alpha=0.7, linewidth=1.5)
+        ax4.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+        ax4.axhline(y=1.5, color='red', linestyle='--', label='Max accel', linewidth=1)
+        ax4.axhline(y=-3.0, color='red', linestyle='--', label='Max decel', linewidth=1)
+        ax4.set_ylabel('Acceleration (m/s²)', fontsize=12)
+        ax4.grid(True, alpha=0.3)
+        ax4.legend(fontsize=8)
+
+        # 5. ACC States (only for ACC vehicles)
+        ax5 = fig.add_subplot(gs[4, 0])
+        acc_indices = [i for i, v in enumerate(self.vehicles) if v.is_acc]
+        if acc_indices:
+            for i in acc_indices:
+                ax5.plot(self.time, self.states[:, i], label=f'V{i}', linewidth=1.5)
+            ax5.set_ylabel('ACC State', fontsize=12)
+            ax5.set_xlabel('Time (s)', fontsize=12)
+            ax5.set_yticks([0, 1, 2, 3])
+            ax5.set_yticklabels(['No Wave', 'Into Wave', 'In Wave', 'Out Wave'], fontsize=9)
+            ax5.grid(True, alpha=0.3)
+            ax5.legend(fontsize=8)
+            ax5.set_title('ACC Vehicle States', fontsize=12)
+        else:
+            ax5.text(0.5, 0.5, 'No ACC vehicles', ha='center', va='center', fontsize=14)
+            ax5.set_xlabel('Time (s)', fontsize=12)
+
+        # 6. Statistics Summary
+        ax6 = fig.add_subplot(gs[4, 1])
+        ax6.axis('off')
+
+        # Calculate statistics
+        min_gaps = np.min(self.space_gaps, axis=0)
+        mean_gaps = np.mean(self.space_gaps, axis=0)
+        max_accels = np.max(np.abs(self.accelerations), axis=0)
+        mean_vels = np.mean(self.velocities, axis=0)
+
+        stats_text = f"Fleet Statistics:\n"
+        stats_text += f"{'='*40}\n"
+        stats_text += f"Penetration Rate: {self.penetration_rate*100:.1f}%\n"
+        stats_text += f"Number of Vehicles: {self.n_vehicles}\n"
+        stats_text += f"ACC Vehicles: {sum(1 for v in self.vehicles if v.is_acc)}\n"
+        stats_text += f"Human Vehicles: {sum(1 for v in self.vehicles if not v.is_acc)}\n\n"
+
+        stats_text += f"Space Gaps:\n"
+        stats_text += f"  Min: {np.min(min_gaps):.2f} m\n"
+        stats_text += f"  Mean: {np.mean(mean_gaps):.2f} m\n"
+        stats_text += f"  Max: {np.max(mean_gaps):.2f} m\n\n"
+
+        stats_text += f"Velocities:\n"
+        stats_text += f"  Min: {np.min(self.velocities):.2f} m/s\n"
+        stats_text += f"  Mean: {np.mean(mean_vels):.2f} m/s\n"
+        stats_text += f"  Max: {np.max(self.velocities):.2f} m/s\n\n"
+
+        stats_text += f"Accelerations:\n"
+        stats_text += f"  Max Accel: {np.max(self.accelerations):.2f} m/s²\n"
+        stats_text += f"  Max Decel: {np.min(self.accelerations):.2f} m/s²\n"
+
+        ax6.text(0.05, 0.95, stats_text, transform=ax6.transAxes,
+                fontsize=10, verticalalignment='top', fontfamily='monospace',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        if filename:
+            plt.savefig(filename, dpi=150, bbox_inches='tight')
+            print(f"Plot saved to {filename}")
+
+        plt.show()
+
+    def calculate_metrics(self) -> dict:
+        """
+        Calculate performance metrics for the fleet
+
+        Returns:
+            Dictionary of metrics
+        """
+        metrics = {
+            'min_space_gap': np.min(self.space_gaps),
+            'mean_space_gap': np.mean(self.space_gaps),
+            'std_space_gap': np.std(self.space_gaps),
+            'max_decel': np.min(self.accelerations),
+            'max_accel': np.max(self.accelerations),
+            'mean_velocity': np.mean(self.velocities),
+            'velocity_std': np.std(self.velocities),
+            'num_close_calls': np.sum(self.space_gaps < 5.0),  # Gaps below 5m
+            'string_stability': self._calculate_string_stability()
+        }
+        return metrics
+
+    def _calculate_string_stability(self) -> float:
+        """
+        Calculate string stability metric
+
+        String stability: ratio of velocity variance at end vs beginning
+        < 1.0 means stable (disturbances attenuate)
+        > 1.0 means unstable (disturbances amplify)
+        """
+        # Use last 20% vs first 20% of simulation
+        n_start = int(0.2 * self.steps)
+        n_end = int(0.2 * self.steps)
+
+        var_start = np.var(self.velocities[:n_start, :])
+        var_end = np.var(self.velocities[-n_end:, :])
+
+        if var_start < 1e-6:
+            return 1.0
+        return var_end / var_start
+
+
+def compare_penetration_rates(n_vehicles: int = 8,
+                              penetration_rates: List[float] = [0.0, 0.25, 0.5, 0.75, 1.0],
+                              duration: float = 100.0,
+                              lead_vehicle_profile=None):
+    """
+    Compare fleet behavior at different ACC penetration rates
+
+    Args:
+        n_vehicles: Number of vehicles in fleet
+        penetration_rates: List of penetration rates to test
+        duration: Simulation duration (s)
+        lead_vehicle_profile: Lead vehicle velocity profile function
+    """
+    results = {}
+
+    # Create output directory
+    output_dir = 'test/fleet_test/results'
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Run simulations for each penetration rate
+    for rate in penetration_rates:
+        print(f"\n{'='*60}")
+        print(f"Running simulation with {rate*100:.0f}% ACC penetration...")
+        print(f"{'='*60}")
+
+        sim = FleetSimulation(
+            n_vehicles=n_vehicles,
+            penetration_rate=rate,
+            duration=duration
+        )
+
+        sim.run(lead_vehicle_profile=lead_vehicle_profile)
+
+        # Plot results
+        filename = f"{output_dir}/fleet_test_penetration_{int(rate*100):03d}.png"
+        sim.plot_results(filename=filename)
+
+        # Calculate metrics
+        metrics = sim.calculate_metrics()
+        results[rate] = metrics
+
+        print(f"\nMetrics:")
+        for key, value in metrics.items():
+            print(f"  {key}: {value:.4f}")
+
+    # Create comparison plot
+    _plot_comparison(results, output_dir)
+
+    return results
+
+
+def _plot_comparison(results: dict, output_dir: str):
+    """Create comparison plots across penetration rates"""
+
+    rates = sorted(results.keys())
+    metrics_to_plot = ['min_space_gap', 'mean_space_gap', 'max_decel',
+                      'velocity_std', 'string_stability']
+
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    axes = axes.flatten()
+
+    for idx, metric in enumerate(metrics_to_plot):
+        values = [results[r][metric] for r in rates]
+        axes[idx].plot([r*100 for r in rates], values, 'o-', linewidth=2, markersize=8)
+        axes[idx].set_xlabel('ACC Penetration Rate (%)', fontsize=11)
+        axes[idx].set_ylabel(metric.replace('_', ' ').title(), fontsize=11)
+        axes[idx].grid(True, alpha=0.3)
+        axes[idx].set_xticks([r*100 for r in rates])
+
+    # Summary text
+    axes[5].axis('off')
+    summary = "Penetration Rate Comparison\n" + "="*40 + "\n\n"
+    summary += "Key Observations:\n\n"
+
+    # String stability comparison
+    stability_0 = results[0.0]['string_stability']
+    stability_100 = results[1.0]['string_stability']
+    summary += f"String Stability:\n"
+    summary += f"  0% ACC: {stability_0:.3f}\n"
+    summary += f"  100% ACC: {stability_100:.3f}\n"
+    if stability_100 < stability_0:
+        summary += f"  → {((stability_0-stability_100)/stability_0*100):.1f}% improvement\n\n"
+    else:
+        summary += f"  → {((stability_100-stability_0)/stability_0*100):.1f}% degradation\n\n"
+
+    # Safety comparison
+    gap_0 = results[0.0]['min_space_gap']
+    gap_100 = results[1.0]['min_space_gap']
+    summary += f"Minimum Space Gap:\n"
+    summary += f"  0% ACC: {gap_0:.2f} m\n"
+    summary += f"  100% ACC: {gap_100:.2f} m\n\n"
+
+    axes[5].text(0.1, 0.9, summary, transform=axes[5].transAxes,
+                fontsize=10, verticalalignment='top', fontfamily='monospace',
+                bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.5))
+
+    plt.suptitle('ACC Penetration Rate Impact on Fleet Performance', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+
+    filename = f"{output_dir}/penetration_rate_comparison.png"
+    plt.savefig(filename, dpi=150, bbox_inches='tight')
+    print(f"\nComparison plot saved to {filename}")
+    plt.show()
+
+
+if __name__ == "__main__":
+    """Run fleet test with various scenarios"""
+
+    # Scenario 1: Lead vehicle maintains constant speed
+    print("\n" + "="*70)
+    print("SCENARIO 1: Constant Lead Vehicle Speed")
+    print("="*70)
+
+    compare_penetration_rates(
+        n_vehicles=8,
+        penetration_rates=[0.0, 0.25, 0.5, 0.75, 1.0],
+        duration=100.0,
+        lead_vehicle_profile=lambda t: 20.0  # Constant 20 m/s
+    )
+
+    # Scenario 2: Lead vehicle with speed oscillations
+    print("\n" + "="*70)
+    print("SCENARIO 2: Oscillating Lead Vehicle Speed")
+    print("="*70)
+
+    def oscillating_profile(t):
+        """Lead vehicle oscillates between 15-25 m/s"""
+        return 20.0 + 5.0 * np.sin(2 * np.pi * t / 20.0)
+
+    compare_penetration_rates(
+        n_vehicles=8,
+        penetration_rates=[0.0, 0.5, 1.0],
+        duration=100.0,
+        lead_vehicle_profile=oscillating_profile
+    )
+
+    print("\n" + "="*70)
+    print("Fleet test completed! Check test/fleet_test/results/ for output plots.")
+    print("="*70)
