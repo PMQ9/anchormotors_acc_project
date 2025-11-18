@@ -74,8 +74,8 @@ class ACCController:
     """
     Adaptive Cruise Control Controller
 
-    Implements a 5-state FSM-based ACC controller with:
-    - Moving average filters for sensor smoothing
+    Implements a 4-state FSM-based ACC controller with:
+    - Moving average filters for sensor smoothing (Simulink-like sliding window)
     - State-dependent control laws
     - Multi-layer safety features
     """
@@ -95,18 +95,19 @@ class ACCController:
         self.state = ACCState.NO_WAVE
         self.initialized = False
 
-        # Filter buffers
+        # Filter buffers (circular)
         self.lead_vel_buffer = np.zeros(self.params.ma_window)
         self.lead_accel_buffer = np.zeros(self.params.ma_window)
-        self.buffer_idx = 0
+        self.buffer_idx = 0                     # single circular index used for both buffers (kept in sync)
         self.buffer_sum_vel = 0.0
         self.buffer_sum_accel = 0.0
+        self.sample_count = 0                   # number of real samples accumulated (<= ma_window)
 
         # Delayed values
         self.prev_lead_vel_combined = 0.0
         self.prev_cmd_accel_filtered = 0.0
 
-        # Smoothed values
+        # Smoothed values (outputs of MAs)
         self.lead_vel_smooth = 0.0
         self.lead_accel_smooth = 0.0
 
@@ -119,35 +120,36 @@ class ACCController:
         self.buffer_idx = 0
         self.buffer_sum_vel = 0.0
         self.buffer_sum_accel = 0.0
+        self.sample_count = 0
         self.prev_lead_vel_combined = 0.0
         self.prev_cmd_accel_filtered = 0.0
         self.lead_vel_smooth = 0.0
         self.lead_accel_smooth = 0.0
 
-    def _moving_average_update(self, new_val: float, buffer: np.ndarray,
-                               buffer_sum: float) -> Tuple[float, float]:
+    def _moving_average_update(self, new_val: float, buffer: np.ndarray, buffer_sum: float) -> Tuple[float, float]:
         """
-        Update moving average with new value
+        Simulink-like sliding window average.
 
-        Args:
-            new_val: New value to add
-            buffer: Circular buffer
-            buffer_sum: Running sum
-
-        Returns:
-            (average, new_sum)
+        Behavior:
+          - Before window is full: avg = (sum of received samples) / sample_count
+          - After window full: avg = (sum of last N samples) / N
+        This avoids zero-padding that would bias the very first outputs.
         """
-        # Remove oldest value from sum
-        old_val = buffer[self.buffer_idx]
-        buffer_sum = buffer_sum - old_val + new_val
+        window = self.params.ma_window
 
-        # Update buffer
-        buffer[self.buffer_idx] = new_val
-
-        # Calculate average
-        avg = buffer_sum / self.params.ma_window
-
-        return avg, buffer_sum
+        if self.sample_count < window:
+            # Window not yet full: append new value and compute average over (sample_count + 1)
+            buffer_sum += new_val
+            buffer[self.buffer_idx] = new_val
+            avg = buffer_sum / (self.sample_count + 1)
+            return avg, buffer_sum
+        else:
+            # Window full: replace oldest value at buffer_idx
+            old_val = buffer[self.buffer_idx]
+            buffer_sum = buffer_sum - old_val + new_val
+            buffer[self.buffer_idx] = new_val
+            avg = buffer_sum / window
+            return avg, buffer_sum
 
     def _clamp(self, value: float, min_val: float, max_val: float) -> float:
         """Clamp value between min and max"""
@@ -158,33 +160,43 @@ class ACCController:
         Update moving average filters and calculate lead acceleration
 
         Args:
-            lead_dist: Distance to lead vehicle (m)
+            lead_dist: Distance to lead vehicle (m) [unused in filter but kept for signature parity]
             rel_vel: Relative velocity (lead - ego) (m/s)
             ego_vel: Ego vehicle velocity (m/s)
         """
         # Calculate lead velocity (combined signal)
         lead_vel_combined = ego_vel + rel_vel
 
-        # Discrete derivative for lead acceleration
+        # Discrete derivative for lead acceleration (use sample_rate to convert to per-second)
+        # Use prev_lead_vel_combined from last call (initialized to 0 until real samples come in)
         lead_accel_raw = (lead_vel_combined - self.prev_lead_vel_combined) * self.params.sample_rate
+
+        # Saturate raw acceleration to sensible bounds (matches earlier code)
         lead_accel_sat = self._clamp(lead_accel_raw, -3.5, 2.0)
 
-        # Update moving averages
+        # Update moving average for velocity and acceleration (Simulink-like behavior)
         self.lead_vel_smooth, self.buffer_sum_vel = self._moving_average_update(
-            lead_vel_combined, self.lead_vel_buffer, self.buffer_sum_vel
+            lead_vel_combined,
+            self.lead_vel_buffer,
+            self.buffer_sum_vel
         )
 
         self.lead_accel_smooth, self.buffer_sum_accel = self._moving_average_update(
-            lead_accel_sat, self.lead_accel_buffer, self.buffer_sum_accel
+            lead_accel_sat,
+            self.lead_accel_buffer,
+            self.buffer_sum_accel
         )
 
-        # Update buffer index (circular)
+        # Advance circular index AFTER both updates (so both wrote to same slot)
         self.buffer_idx = (self.buffer_idx + 1) % self.params.ma_window
 
-        # Store for next iteration
+        # Increment sample_count up to window size (Simulink semantics)
+        self.sample_count = min(self.sample_count + 1, self.params.ma_window)
+
+        # Store for next derivative calculation
         self.prev_lead_vel_combined = lead_vel_combined
 
-    def _update_state(self, lead_dist: float):
+    def _update_state(self, lead_dist: float, ego_vel: float, rel_vel: float):
         """
         Update FSM state based on conditions
 
@@ -193,7 +205,9 @@ class ACCController:
         """
         # Handle initial state (first call after reset)
         if not self.initialized:
-            if self.lead_vel_smooth > self.params.no_wave_velo or lead_dist > 200.0:
+            # Use raw (not smoothed) lead velocity for startup decision to match Simulink initialization semantics
+            lead_vel_raw = ego_vel + rel_vel
+            if lead_vel_raw > self.params.no_wave_velo or lead_dist > 200.0:
                 self.state = ACCState.NO_WAVE
             else:
                 self.state = ACCState.IN_WAVE
@@ -345,11 +359,11 @@ class ACCController:
         Returns:
             (cmd_accel, state): Commanded acceleration and current FSM state
         """
-        # Update filters
+        # Update filters (note: signature matches the implementation above)
         self._update_filters(lead_dist, rel_vel, ego_vel)
 
         # Update state machine
-        self._update_state(lead_dist)
+        self._update_state(lead_dist, ego_vel, rel_vel)
 
         # Calculate control based on state
         cmd_accel = self._calculate_control(lead_dist, rel_vel, ego_vel)
