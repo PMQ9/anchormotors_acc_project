@@ -21,11 +21,11 @@ class IntelligentDriverModel(Controller):
 
         T = 1.5
 
-        s0 = 2.0
+        s0 = 3.0
 
-        a = 0.3
+        a = 1.0
 
-        b = 3.0
+        b = 5.0
 
         delta = 4.0
 

@@ -113,7 +113,7 @@ class Simulation:
 
         plt.xlabel("Time (s)")
         plt.ylabel("Space Gap (m)")
-        plt.title(f"Space Gaps for All Cars, {self.percentage}%")
+        plt.title(f"Space Gaps for All Cars, {self.percentage * 100}%")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
@@ -148,7 +148,7 @@ class Simulation:
 
         plt.xlabel("Time (s)")
         plt.ylabel("Position (m)")
-        plt.title(f"Position for All Cars, {self.percentage}%")
+        plt.title(f"Position for All Cars, {self.percentage * 100}%")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
@@ -181,7 +181,7 @@ class Simulation:
 
         plt.xlabel("Time (s)")
         plt.ylabel("Velocity (m/s)")
-        plt.title(f"Velocities for All Cars, {self.percentage}%")
+        plt.title(f"Velocities for All Cars, {self.percentage * 100}%")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
@@ -214,7 +214,7 @@ class Simulation:
 
         plt.xlabel("Time (s)")
         plt.ylabel("Velocity (m/s^2)")
-        plt.title(f"Accelerations for All Cars, {self.percentage}%")
+        plt.title(f"Accelerations for All Cars, {self.percentage * 100}%")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
@@ -244,7 +244,7 @@ class Simulation:
 
         plt.xlabel("Time (s)")
         plt.ylabel("Relative Velocity (m/s)")
-        plt.title(f"Relative Velocities for All Car Pairs, {self.percentage}%")
+        plt.title(f"Relative Velocities for All Car Pairs, {self.percentage * 100}%")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
@@ -272,7 +272,7 @@ class Simulation:
         )
         plt.xlabel('Time (s)')
         plt.ylabel('Mode')
-        plt.title(f'Controller Mode over Time — All Cars Using OurController, {self.percentage}%')
+        plt.title(f'Controller Mode over Time — All Cars Using OurController, {self.percentage * 100}%')
         plt.grid(True)
         plt.legend(loc='upper right', bbox_to_anchor=(1.25, 1.0))  # keeps plot clean
         plt.tight_layout()
@@ -307,7 +307,7 @@ class Simulation:
 
         plt.xlabel("Car Index")
         plt.ylabel("Speed (m/s)")
-        plt.title(f"Speed Distribution per Car, {self.percentage}%")
+        plt.title(f"Speed Distribution per Car, {self.percentage * 100}%")
         plt.grid(True, axis='y')
         plt.xticks(range(self.n_cars), [str(i) for i in range(self.n_cars)])
         plt.tight_layout()
@@ -315,12 +315,13 @@ class Simulation:
 
     def compute_metrics(self, hard_brake_threshold=-3.0):
         """
-        Compute key metrics for the simulation.
+        Compute key metrics for the simulation, including string stability, crashes, hard braking,
+        and macroscopic traffic metrics (flow and density).
 
         Returns:
             dict containing:
-                - max_jerk_per_car: list of max jerks
-                - string_stability: max deviation of space gaps from desired spacing
+                - max_jerk_per_car: list of max jerks per car
+                - string_stability_index: max amplification ratio of spacing errors (time-domain)
                 - num_crashes: total number of cars that crash (space_gap <= 0)
                 - first_crash_index: index of the first car that crashes
                 - hard_brake_times: list of total time each car spent braking hard
@@ -330,22 +331,25 @@ class Simulation:
         num_crashes = 0
         first_crash_index = None
 
-        string_stability = 0  # could define as max deviation of spacing from initial spacing
+        # For string stability calculation
+        spacing_errors = []
+
+        positions_all = []
 
         for i, car in enumerate(self.cars):
-            # Convert to numpy arrays for convenience
             accels = np.array(car.cmd_accels)
             positions = np.array(car.positions)
+            speeds = np.array(car.velocities)
             gaps = np.array(car.space_gaps)
+
+            positions_all.append(positions[-1])  # track final positions for density/flow
 
             # --- Max jerk ---
             jerk = np.diff(accels) / self.dt
-            max_jerk = np.max(np.abs(jerk))
-            max_jerk_per_car.append(max_jerk)
+            max_jerk_per_car.append(np.max(np.abs(jerk)))
 
             # --- Hard brake time ---
-            hard_brake_time = np.sum(accels <= hard_brake_threshold) * self.dt
-            hard_brake_times.append(hard_brake_time)
+            hard_brake_times.append(np.sum(accels <= hard_brake_threshold) * self.dt)
 
             # --- Crashes ---
             if np.any(gaps <= 0):
@@ -353,18 +357,32 @@ class Simulation:
                 if first_crash_index is None:
                     first_crash_index = i
 
-            # --- String stability ---
-            if i > 0:  # only followers
-                desired_gap = positions[0] - positions[i]  # or initial spacing
-                max_deviation = np.max(np.abs(gaps - desired_gap))
-                string_stability = max(string_stability, max_deviation)
+            # --- Spacing errors for string stability ---
+            if i == 0:
+                # Lead car: desired gap is the initial spacing to some reference (can set to zero)
+                spacing_errors.append(np.zeros_like(gaps))
+            else:
+                desired_gap = np.mean(self.cars[i-1].space_gaps)  # or initial spacing
+                spacing_errors.append(gaps - desired_gap)
+
+        # --- Propagation-based string stability ---
+        string_stability_ratios = []
+        for i in range(1, len(self.cars)):
+            prev_max_error = np.max(np.abs(spacing_errors[i-1])) + 1e-6  # avoid division by zero
+            curr_max_error = np.max(np.abs(spacing_errors[i]))
+            ratio = curr_max_error / prev_max_error
+            string_stability_ratios.append(ratio)
+
+        string_stability_index = max(string_stability_ratios) if string_stability_ratios else 0
+
 
         metrics = {
             "max_jerk_per_car": max_jerk_per_car,
-            "string_stability": string_stability,
+            "string_stability_index": string_stability_index,
             "num_crashes": num_crashes,
             "first_crash_index": first_crash_index,
-            "hard_brake_times": hard_brake_times
+            "hard_brake_times": hard_brake_times,
         }
 
         return metrics
+
