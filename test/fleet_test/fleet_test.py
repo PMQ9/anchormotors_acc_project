@@ -286,8 +286,8 @@ class FleetSimulation:
         Args:
             filename: Filename to save plot (if None, just display)
         """
-        fig = plt.figure(figsize=(16, 12))
-        gs = GridSpec(5, 2, figure=fig, hspace=0.3, wspace=0.3)
+        fig = plt.figure(figsize=(16, 14))
+        gs = GridSpec(6, 2, figure=fig, hspace=0.3, wspace=0.3)
 
         # Color scheme: ACC vehicles in blue, human in red
         colors = ['blue' if v.is_acc else 'red' for v in self.vehicles]
@@ -340,34 +340,50 @@ class FleetSimulation:
         ax4.grid(True, alpha=0.3)
         ax4.legend(fontsize=8)
 
-        # 5. ACC States (only for ACC vehicles)
-        ax5 = fig.add_subplot(gs[4, 0])
+        # 5. Jerk vs Time (rate of change of acceleration)
+        ax5 = fig.add_subplot(gs[4, :])
+        # Calculate jerk for each vehicle (derivative of acceleration)
+        jerks = np.zeros_like(self.accelerations)
+        for i in range(self.n_vehicles):
+            jerks[1:, i] = np.diff(self.accelerations[:, i]) / self.dt
+            jerks[0, i] = jerks[1, i]  # Fill first value with second to avoid gap
+
+        for i in range(self.n_vehicles):
+            ax5.plot(self.time, jerks[:, i], color=colors[i], alpha=0.7, linewidth=1.5)
+        ax5.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+        ax5.set_ylabel('Jerk (m/s³)', fontsize=12)
+        ax5.grid(True, alpha=0.3)
+        ax5.set_title('Rate of Change of Acceleration (Jerk)', fontsize=12)
+
+        # 6. ACC States (only for ACC vehicles)
+        ax6 = fig.add_subplot(gs[5, 0])
         acc_indices = [i for i, v in enumerate(self.vehicles) if v.is_acc]
         if acc_indices:
             for i in acc_indices:
-                ax5.plot(self.time, self.states[:, i], label=f'V{i}', linewidth=1.5, alpha=0.7)
-            ax5.set_ylabel('ACC State', fontsize=12)
-            ax5.set_xlabel('Time (s)', fontsize=12)
-            ax5.set_yticks([0, 1, 2, 3])
-            ax5.set_yticklabels(['No Wave', 'Into Wave', 'In Wave', 'Out Wave'], fontsize=9)
-            ax5.grid(True, alpha=0.3)
+                ax6.plot(self.time, self.states[:, i], label=f'V{i}', linewidth=1.5, alpha=0.7)
+            ax6.set_ylabel('ACC State', fontsize=12)
+            ax6.set_xlabel('Time (s)', fontsize=12)
+            ax6.set_yticks([0, 1, 2, 3])
+            ax6.set_yticklabels(['No Wave', 'Into Wave', 'In Wave', 'Out Wave'], fontsize=9)
+            ax6.grid(True, alpha=0.3)
             # Only show legend if <= 8 ACC vehicles
             if len(acc_indices) <= 8:
-                ax5.legend(fontsize=8, ncol=2)
-            ax5.set_title(f'ACC Vehicle States ({len(acc_indices)} vehicles)', fontsize=12)
+                ax6.legend(fontsize=8, ncol=2)
+            ax6.set_title(f'ACC Vehicle States ({len(acc_indices)} vehicles)', fontsize=12)
         else:
-            ax5.text(0.5, 0.5, 'No ACC vehicles', ha='center', va='center', fontsize=14)
-            ax5.set_xlabel('Time (s)', fontsize=12)
+            ax6.text(0.5, 0.5, 'No ACC vehicles', ha='center', va='center', fontsize=14)
+            ax6.set_xlabel('Time (s)', fontsize=12)
 
-        # 6. Statistics Summary
-        ax6 = fig.add_subplot(gs[4, 1])
-        ax6.axis('off')
+        # 7. Statistics Summary
+        ax7 = fig.add_subplot(gs[5, 1])
+        ax7.axis('off')
 
         # Calculate statistics
         min_gaps = np.min(self.space_gaps, axis=0)
         mean_gaps = np.mean(self.space_gaps, axis=0)
         max_accels = np.max(np.abs(self.accelerations), axis=0)
         mean_vels = np.mean(self.velocities, axis=0)
+        max_jerks = np.max(np.abs(jerks), axis=0)
 
         stats_text = f"Fleet Statistics:\n"
         stats_text += f"{'='*40}\n"
@@ -388,9 +404,13 @@ class FleetSimulation:
 
         stats_text += f"Accelerations:\n"
         stats_text += f"  Max Accel: {np.max(self.accelerations):.2f} m/s²\n"
-        stats_text += f"  Max Decel: {np.min(self.accelerations):.2f} m/s²\n"
+        stats_text += f"  Max Decel: {np.min(self.accelerations):.2f} m/s²\n\n"
 
-        ax6.text(0.05, 0.95, stats_text, transform=ax6.transAxes,
+        stats_text += f"Jerk:\n"
+        stats_text += f"  Max Jerk: {np.max(np.abs(jerks)):.2f} m/s³\n"
+        stats_text += f"  Mean Jerk: {np.mean(max_jerks):.2f} m/s³\n"
+
+        ax7.text(0.05, 0.95, stats_text, transform=ax7.transAxes,
                 fontsize=10, verticalalignment='top', fontfamily='monospace',
                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
 
@@ -409,6 +429,12 @@ class FleetSimulation:
         Returns:
             Dictionary of metrics
         """
+        # Calculate jerk for all vehicles
+        jerks = np.zeros_like(self.accelerations)
+        for i in range(self.n_vehicles):
+            jerks[1:, i] = np.diff(self.accelerations[:, i]) / self.dt
+            jerks[0, i] = jerks[1, i]
+
         metrics = {
             'min_space_gap': np.min(self.space_gaps),
             'mean_space_gap': np.mean(self.space_gaps),
@@ -418,7 +444,9 @@ class FleetSimulation:
             'mean_velocity': np.mean(self.velocities),
             'velocity_std': np.std(self.velocities),
             'num_close_calls': np.sum(self.space_gaps < 5.0),  # Gaps below 5m
-            'string_stability': self._calculate_string_stability()
+            'string_stability': self._calculate_string_stability(),
+            'max_jerk': np.max(np.abs(jerks)),
+            'mean_jerk': np.mean(np.abs(jerks))
         }
         return metrics
 
