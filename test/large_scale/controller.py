@@ -24,18 +24,18 @@ class IntelligentDriverModel(Controller):
 
         T = 1.5
 
-        s0 = 3.0
+        s0 = 5.0
 
         a = 1.0
 
-        b = 5.0
+        b = 2.0
 
         delta = 4.0
 
         # Prevent invalid or dangerous inputs
         ego_velocity = max(0.0, ego_velocity)                 # no backward speed
         space_gap = max(0.1, space_gap)                      # prevent division by zero
-        rel = relative_velocity
+        rel = -relative_velocity
 
         # Safe sqrt
         ab = max(1e-6, a * b)
