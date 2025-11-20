@@ -173,6 +173,8 @@ The fleet simulation calculates the following metrics:
 - **velocity_std** - Velocity variance across fleet
 - **num_close_calls** - Number of times gap < 5m
 - **string_stability** - Variance amplification ratio (< 1.0 = stable)
+- **max_jerk** - Maximum jerk magnitude (comfort metric, m/s³)
+- **mean_jerk** - Average jerk magnitude (smoothness metric, m/s³)
 
 ### Visualization Outputs
 
@@ -182,8 +184,9 @@ The fleet test generates comprehensive plots showing:
 2. **Space Gap vs Time** - Following distance for each vehicle
 3. **Velocity vs Time** - Speed profile of each vehicle
 4. **Acceleration vs Time** - Commanded acceleration for each vehicle
-5. **ACC States vs Time** - FSM state for ACC-equipped vehicles
-6. **Statistics Summary** - Key metrics and performance indicators
+5. **Jerk vs Time** - Rate of change of acceleration (comfort metric, m/s³)
+6. **ACC States vs Time** - FSM state for ACC-equipped vehicles
+7. **Statistics Summary** - Key metrics and performance indicators including max/mean jerk
 
 ### Example: Comparing Penetration Rates
 
