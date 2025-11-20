@@ -16,23 +16,40 @@ class Controller:
         raise NotImplementedError("Subclass must implement abstract method")
 
 class IntelligentDriverModel(Controller):
-    def command_acceleration(self, ego_velocity, space_gap, relative_velocity, max_velocity = 35.0, no_wave_velocity = 13.5, wave_velocity = 10.0, time_step = 0.1):
+    def command_acceleration(self, ego_velocity, space_gap, relative_velocity,
+                             max_velocity=35.0, no_wave_velocity=13.5,
+                             wave_velocity=10.0, time_step=0.1):
+        # IDM parameters
         v0 = max_velocity
 
         T = 1.5
 
-        s0 = 3.0
+        s0 = 5.0
 
         a = 1.0
 
-        b = 5.0
+        b = 2.0
 
         delta = 4.0
 
-        s_star = s0 + max(0, ego_velocity * T + (ego_velocity * relative_velocity) / (2 * math.sqrt(a * b)))
+        # Prevent invalid or dangerous inputs
+        ego_velocity = max(0.0, ego_velocity)                 # no backward speed
+        space_gap = max(0.1, space_gap)                      # prevent division by zero
+        rel = -relative_velocity
 
-        dv_dt = a * (1 - (ego_velocity / max_velocity)**delta - (s_star / space_gap) ** 2)
-        
+        # Safe sqrt
+        ab = max(1e-6, a * b)
+
+        # Desired dynamic gap
+        s_star = s0 + max(0.0, ego_velocity * T + (ego_velocity * rel) / (2 * math.sqrt(ab)))
+
+        # IDM acceleration
+        try:
+            dv_dt = a * (1 - (ego_velocity / v0)**delta - (s_star / space_gap)**2)
+        except OverflowError:
+            dv_dt = -5.0   # strong brake fallback
+
+        # Clamp acceleration to vehicle capability
         return max(-3.0, min(1.5, dv_dt))
 
 class OurController(Controller):
