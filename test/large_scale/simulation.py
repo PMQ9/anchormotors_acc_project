@@ -384,5 +384,58 @@ class Simulation:
             "hard_brake_times": hard_brake_times,
         }
 
-        return metrics
+        metrics["final_density"] = self.compute_final_density()
+        metrics["final_flow"] = self.compute_final_flow()
 
+        final_velocity = np.mean([car.velocities[-1] for car in self.cars])
+        metrics["final_velocity"] = final_velocity
+
+        return metrics
+    
+    def compute_final_density(self, segment_min=200.0, segment_max=300.0, last_time=10.0):
+        """
+        Compute average density over the last `last_time` seconds for a fixed segment
+        [segment_min, segment_max], including only timesteps where cars are present.
+        """
+        n_steps = int(last_time / self.dt)
+        density_sum = 0.0
+        valid_steps = 0
+
+        for t in range(-n_steps, 0):
+            positions = np.array([car.positions[t] for car in self.cars])
+            segment_mask = (positions >= segment_min) & (positions <= segment_max)
+            segment_cars = np.array(self.cars)[segment_mask]
+
+            if len(segment_cars) == 0:
+                continue  # skip empty timestep
+
+            density_sum += len(segment_cars) * self.dt
+            valid_steps += 1
+
+        total_time = valid_steps * self.dt
+        return density_sum / (segment_max - segment_min) / total_time if total_time > 0 else 0.0
+
+
+    def compute_final_flow(self, segment_min=200.0, segment_max=300.0, last_time=10.0):
+        """
+        Compute average flow over the last `last_time` seconds for a fixed segment
+        [segment_min, segment_max], including only timesteps where cars are present.
+        """
+        n_steps = int(last_time / self.dt)
+        flow_sum = 0.0
+        valid_steps = 0
+
+        for t in range(-n_steps, 0):
+            positions = np.array([car.positions[t] for car in self.cars])
+            speeds = np.array([car.velocities[t] for car in self.cars])
+            segment_mask = (positions >= segment_min) & (positions <= segment_max)
+            segment_speeds = speeds[segment_mask]
+
+            if len(segment_speeds) == 0:
+                continue  # skip empty timestep
+
+            flow_sum += np.sum(segment_speeds) * self.dt
+            valid_steps += 1
+
+        total_time = valid_steps * self.dt
+        return flow_sum / (segment_max - segment_min) / total_time if total_time > 0 else 0.0
