@@ -6,9 +6,11 @@ An intelligent ACC system that classifies traffic states and dynamically adjusts
 
 ## Demo
 
-[![Road Test Demo](https://img.youtube.com/vi/8MEH_VP9whk/maxresdefault.jpg)](https://youtu.be/8MEH_VP9whk?si=Rs65htik8K1zbWX8)
+<a href="https://youtu.be/8MEH_VP9whk?si=Rs65htik8K1zbWX8" target="_blank">
+  <img src="https://img.youtube.com/vi/8MEH_VP9whk/maxresdefault.jpg" alt="Road Test Demo" width="100%"/>
+</a>
 
-**[Watch Road Test Video](https://youtu.be/8MEH_VP9whk?si=Rs65htik8K1zbWX8)**
+**<a href="https://youtu.be/8MEH_VP9whk?si=Rs65htik8K1zbWX8" target="_blank">Watch Road Test Video</a>**
 
 ---
 
@@ -29,11 +31,15 @@ Standard ACC systems react only to the immediate vehicle ahead, amplifying phant
 | 2 | In Wave | Slow or stopped traffic |
 | 3 | Out of Wave | Accelerating out of congestion |
 
+<img src="doc/img/finite_state_machine.png" alt="State Machine" width="90%"/>
+
 ### Control Equation
 
 ```
 dv/dt = α(s - (τv + s_min)) + k·Δv
 ```
+
+<img src="doc/img/control_algorithm.png" alt="Control Algorithm" width="50%"/>
 
 | Mode | α | τ | s_min | k |
 |------|---|---|-------|---|
@@ -56,6 +62,30 @@ dv/dt = α(s - (τv + s_min)) + k·Δv
 | 100% | Catastrophic | Crashes | Poor | Not Recommended |
 
 **Key Finding:** Mixed fleets outperform homogeneous fleets. Human drivers provide crucial damping at high penetration rates.
+
+**ROS/Docker test after road test improvements**
+
+<img src="doc/img/ROS-results.png" alt="Docker/ROS test" width="90%"/>
+
+**Synthetic Simlation: String stability at 100% penetration rate under certain conditions**
+
+<img src="doc/img/Synthetic_test_string_stable.png" alt="Synthetic test string stable" width="90%"/>
+
+**Synthetic Simulation: Stable performance until penetration exceeds 75%**
+
+<img src="doc/img/Synthetic_test_perfomance_impact_on_penetration_rate.png" alt="Performance impact of penetration rate" width="90%"/>
+
+**NGSIM Simulation:  Time space diagram, 50% penetration**
+
+<img src="doc/img/NGSIM_50%25.png" alt="NGSIM at 50%" width="90%"/>
+
+**NGSIM Simulation:  Time space diagram, 100% penetration**
+
+<img src="doc/img/NGSIM_100%25.png" alt="NGSIM at 100%" width="90%"/>
+
+**Speed distributions, 100% penetration**
+
+<img src="doc/img/NGSIM_speed_distribution.png" alt="NGSIM Speed Distribution" width="90%"/>
 
 ---
 
@@ -89,7 +119,7 @@ Python-based fleet simulations with NGSIM data. See [`test/large_scale/README.md
 
 Automated testing via GitHub Actions with Grafana monitoring.
 
-<img src=".github/grafana_dashboard_image.png" alt="Grafana Dashboard" width="100%"/>
+<img src="doc/img/grafana_dashboard.png" alt="Grafana Dashboard" width="100%"/>
 
 **[View Live Dashboard](https://pmq9.grafana.net/public-dashboards/09e1212bd2f5467d9a5c53ad9e4237c3)**
 
