@@ -31,9 +31,9 @@ class ACCParameters:
 
     # Control gains for each state
     # State 0: No Wave
-    alpha_no_wave: float = 0.15
-    tau_no_wave: float = 2.0
-    beta_no_wave: float = 0.424
+    alpha_no_wave: float = 0.9
+    tau_no_wave: float = 2.4
+    beta_no_wave: float = 0.245
 
     # State 1: Into Wave
     alpha_into_wave: float = 0.7
@@ -41,9 +41,9 @@ class ACCParameters:
     beta_into_wave: float = 0.23
 
     # State 2: In Wave
-    alpha_in_wave: float = 0.2
-    tau_in_wave: float = 2.5
-    beta_in_wave: float = 0.35
+    alpha_in_wave: float = 0.9
+    tau_in_wave: float = 2.4
+    beta_in_wave: float = 0.245
 
     # State 3: Out of Wave
     alpha_out_wave: float = 1.1

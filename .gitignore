@@ -13,6 +13,7 @@ slprj/
 *.bag
 
 __pycache__/
+venv/
 
 # ros generated files
 anchormotors_ert_rtw/*

@@ -120,13 +120,13 @@ class OurController(Controller):
 
         soft_velocity_a = min(1, (1/3) * min(3, max(0, max_velo - ego_velocity)))
 
-        alpha = 0.15
+        alpha = 0.9
 
         s_min = 10
         
-        tau = 2.0
+        tau = 2.4
 
-        beta = 0.424
+        beta = 0.245
 
         soft_velocity_b = min(1.5, max(-3, alpha * (space_gap - s_min - (ego_velocity * tau)) + (beta * relative_velocity)))
 
@@ -150,13 +150,13 @@ class OurController(Controller):
     def in_wave(self, ego_velocity, space_gap, relative_velocity, max_velocity = 35.0, no_wave_velocity = 13.5, wave_velocity = 10.0, time_step = 0.1):
         cmd_accel = 0
 
-        alpha = 0.2
+        alpha = 0.9
 
-        tau = 2.5
+        tau = 2.4
 
         s_min = 10.0
 
-        beta = 0.35
+        beta = 0.245
 
         cmd_accel = alpha * (space_gap - s_min - (ego_velocity * tau)) + (relative_velocity * beta)
 
