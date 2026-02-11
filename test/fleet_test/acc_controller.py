@@ -268,11 +268,16 @@ class ACCController:
             Commanded acceleration (m/s²)
         """
         if self.state == ACCState.NO_WAVE:
+            # Dynamic safe velocity based on stopping distance
+            lead_vel = ego_vel + rel_vel
+            gap_error = lead_dist - self.params.desired_distance - self.params.tau_no_wave * ego_vel
+            v_safe = lead_vel + np.sqrt(2.0 * abs(self.params.max_decel) * max(gap_error, 0.0))
+            desired_vel = min(self.params.max_velo, 35.0, v_safe)
+
             # Velocity approach controller
-            desired_vel = min(self.params.max_velo, 35.0)
             vel_error = desired_vel - ego_vel
-            vel_error_sat = self._clamp(vel_error, 0.0, 3.0)
-            vel_approach = 0.333 * vel_error_sat
+            vel_error_sat = self._clamp(vel_error, -6.0, 3.0)
+            vel_approach = (1.0 / 3.0) * vel_error_sat
             vel_limiter = min(vel_approach, 1.0)
 
             # Distance-based acceleration (Simulink formula structure)
@@ -283,8 +288,8 @@ class ACCController:
             )
             distance_accel_sat = self._clamp(distance_accel, self.params.max_decel, self.params.max_accel)
 
-            # Combined output
-            cmd_accel = vel_limiter * distance_accel_sat
+            # Combined output with min block: pass braking through unattenuated
+            cmd_accel = min(vel_limiter * distance_accel_sat, distance_accel_sat)
 
         elif self.state == ACCState.INTO_WAVE:
             # Simulink formula structure

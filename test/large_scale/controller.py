@@ -114,23 +114,29 @@ class OurController(Controller):
         return new_mode
 
     def no_wave(self, ego_velocity, space_gap, relative_velocity, max_velocity = 35.0, no_wave_velocity = 13.5, wave_velocity = 10.0, time_step = 0.1):
-        cmd_accel = 0
+        alpha = 0.9
+        s_min = 10
+        tau = 2.4
+        beta = 0.245
+        max_decel = 3.0
 
         max_velo = min(35, max_velocity)
 
-        soft_velocity_a = min(1, (1/3) * min(3, max(0, max_velo - ego_velocity)))
+        # Dynamic safe velocity based on stopping distance
+        lead_vel = ego_velocity + relative_velocity
+        gap_error = space_gap - s_min - (ego_velocity * tau)
+        v_safe = lead_vel + math.sqrt(2.0 * max_decel * max(0, gap_error))
+        effective_max = min(max_velo, v_safe)
 
-        alpha = 0.9
+        # Velocity approach limiter (Saturation2 limits: [-6, 3])
+        vel_error = max(-6, min(3, effective_max - ego_velocity))
+        soft_velocity_a = min(1, (1/3) * vel_error)
 
-        s_min = 10
-        
-        tau = 2.4
+        # Distance-based acceleration
+        soft_velocity_b = min(1.5, max(-3, alpha * gap_error + (beta * relative_velocity)))
 
-        beta = 0.245
-
-        soft_velocity_b = min(1.5, max(-3, alpha * (space_gap - s_min - (ego_velocity * tau)) + (beta * relative_velocity)))
-
-        cmd_accel = min(1.5, max(-3, soft_velocity_a * soft_velocity_b))
+        # Min block: pass braking through unattenuated
+        cmd_accel = min(1.5, max(-3, min(soft_velocity_a * soft_velocity_b, soft_velocity_b)))
 
         return cmd_accel
 
