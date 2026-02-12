@@ -111,6 +111,9 @@ class ACCController:
         self.lead_vel_smooth = 0.0
         self.lead_accel_smooth = 0.0
 
+        # Raw lead velocity (for classification transitions that use unfiltered value)
+        self.lead_vel_raw = 0.0
+
     def reset(self):
         """Reset controller to initial state"""
         self.state = ACCState.NO_WAVE
@@ -125,6 +128,7 @@ class ACCController:
         self.prev_cmd_accel_filtered = 0.0
         self.lead_vel_smooth = 0.0
         self.lead_accel_smooth = 0.0
+        self.lead_vel_raw = 0.0
 
     def _moving_average_update(self, new_val: float, buffer: np.ndarray, buffer_sum: float) -> Tuple[float, float]:
         """
@@ -166,6 +170,7 @@ class ACCController:
         """
         # Calculate lead velocity (combined signal)
         lead_vel_combined = ego_vel + rel_vel
+        self.lead_vel_raw = lead_vel_combined
 
         # Discrete derivative for lead acceleration (use sample_rate to convert to per-second)
         # Use prev_lead_vel_combined from last call (initialized to 0 until real samples come in)
@@ -216,11 +221,11 @@ class ACCController:
 
         # State transitions based on current state
         if self.state == ACCState.NO_WAVE:
-            # No Wave → Into Wave
+            # No Wave → Into Wave (uses raw lead velocity, matching Simulink)
             condition1 = (self.lead_accel_smooth < self.params.accel_threshold_neg_high and
-                         self.lead_vel_smooth < self.params.no_wave_velo and
+                         self.lead_vel_raw < self.params.no_wave_velo and
                          lead_dist < 200.0)
-            condition2 = (self.lead_vel_smooth < self.params.no_wave_velo and
+            condition2 = (self.lead_vel_raw < self.params.no_wave_velo and
                          lead_dist < self.params.close_distance)
 
             if condition1 or condition2:
@@ -238,9 +243,9 @@ class ACCController:
                 self.state = ACCState.NO_WAVE
 
         elif self.state == ACCState.IN_WAVE:
-            # In Wave → Out of Wave
+            # In Wave → Out of Wave (uses raw lead velocity, matching Simulink)
             if (self.lead_accel_smooth > self.params.accel_threshold_pos_high and
-                self.lead_vel_smooth > self.params.wave_velo):
+                self.lead_vel_raw > self.params.wave_velo):
                 self.state = ACCState.OUT_OF_WAVE
             # In Wave → No Wave
             elif lead_dist > self.params.far_distance:
