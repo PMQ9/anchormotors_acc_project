@@ -114,10 +114,10 @@ class OurController(Controller):
         return new_mode
 
     def no_wave(self, ego_velocity, space_gap, relative_velocity, max_velocity = 35.0, no_wave_velocity = 13.5, wave_velocity = 10.0, time_step = 0.1):
-        alpha = 0.9
+        alpha = 0.6250
         s_min = 10
-        tau = 2.4
-        beta = 0.245
+        tau = 2.0460
+        beta = 0.2110
         max_decel = 3.0
 
         max_velo = min(35, max_velocity)
@@ -156,13 +156,13 @@ class OurController(Controller):
     def in_wave(self, ego_velocity, space_gap, relative_velocity, max_velocity = 35.0, no_wave_velocity = 13.5, wave_velocity = 10.0, time_step = 0.1):
         cmd_accel = 0
 
-        alpha = 0.9
+        alpha = 0.646
 
-        tau = 2.4
+        tau = 2.2530
 
         s_min = 10.0
 
-        beta = 0.245
+        beta = 0.2130
 
         cmd_accel = alpha * (space_gap - s_min - (ego_velocity * tau)) + (relative_velocity * beta)
 
