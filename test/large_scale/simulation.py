@@ -101,11 +101,11 @@ class Simulation:
                 label = "Leader" if not legend_added["Leader"] else None
                 legend_added["Leader"] = True
             elif isinstance(car.controller, OurController):
-                color = "red"
+                color = "blue"
                 label = "OurController" if not legend_added["OurController"] else None
                 legend_added["OurController"] = True
             else:
-                color = "blue"
+                color = "red"
                 label = "IDM" if not legend_added["IDM"] else None
                 legend_added["IDM"] = True
 
@@ -136,11 +136,11 @@ class Simulation:
                 label = "Leader" if not legend_added["Leader"] else None
                 legend_added["Leader"] = True
             elif isinstance(car.controller, OurController):
-                color = "red"
+                color = "blue"
                 label = "OurController" if not legend_added["OurController"] else None
                 legend_added["OurController"] = True
             else:
-                color = "blue"
+                color = "red"
                 label = "IDM" if not legend_added["IDM"] else None
                 legend_added["IDM"] = True
 
@@ -169,11 +169,11 @@ class Simulation:
                 label = "Leader" if not legend_added["Leader"] else None
                 legend_added["Leader"] = True
             elif isinstance(car.controller, OurController):
-                color = "red"
+                color = "blue"
                 label = "OurController" if not legend_added["OurController"] else None
                 legend_added["OurController"] = True
             else:
-                color = "blue"
+                color = "red"
                 label = "IDM" if not legend_added["IDM"] else None
                 legend_added["IDM"] = True
 
@@ -202,11 +202,11 @@ class Simulation:
                 label = "Leader" if not legend_added["Leader"] else None
                 legend_added["Leader"] = True
             elif isinstance(car.controller, OurController):
-                color = "red"
+                color = "blue"
                 label = "OurController" if not legend_added["OurController"] else None
                 legend_added["OurController"] = True
             else:
-                color = "blue"
+                color = "red"
                 label = "IDM" if not legend_added["IDM"] else None
                 legend_added["IDM"] = True
 
@@ -231,11 +231,11 @@ class Simulation:
             follower = self.cars[i]
 
             if isinstance(follower.controller, OurController):
-                color = "red"
+                color = "blue"
                 label = "OurController" if not legend_added["OurController"] else None
                 legend_added["OurController"] = True
             else:
-                color = "blue"
+                color = "red"
                 label = "IDM" if not legend_added["IDM"] else None
                 legend_added["IDM"] = True
 
@@ -289,9 +289,9 @@ class Simulation:
             if i == 0:
                 colors.append("black")           # leader
             elif isinstance(car.controller, OurController):
-                colors.append("red")             # our controller
+                colors.append("blue")             # our controller
             else:
-                colors.append("blue")            # IDM
+                colors.append("red")            # IDM
 
         plt.figure(figsize=(14,6))
         box = plt.boxplot(speeds_all, patch_artist=True, positions=range(self.n_cars))
