@@ -1,6 +1,7 @@
-import numpy as np
 import random
+import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 from controller import OurController, IntelligentDriverModel, Controller
 from car import Car
 
@@ -102,7 +103,7 @@ class Simulation:
                 legend_added["Leader"] = True
             elif isinstance(car.controller, OurController):
                 color = "blue"
-                label = "OurController" if not legend_added["OurController"] else None
+                label = "Experimental Controller" if not legend_added["OurController"] else None
                 legend_added["OurController"] = True
             else:
                 color = "red"
@@ -113,7 +114,7 @@ class Simulation:
 
         plt.xlabel("Time (s)")
         plt.ylabel("Space Gap (m)")
-        plt.title(f"Space Gaps for All Cars, {self.percentage * 100}%")
+        plt.title(f"Space Gaps for All Cars, {self.percentage * 100}% Penetration Rate")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
@@ -137,7 +138,7 @@ class Simulation:
                 legend_added["Leader"] = True
             elif isinstance(car.controller, OurController):
                 color = "blue"
-                label = "OurController" if not legend_added["OurController"] else None
+                label = "Experimental Controller" if not legend_added["OurController"] else None
                 legend_added["OurController"] = True
             else:
                 color = "red"
@@ -148,7 +149,7 @@ class Simulation:
 
         plt.xlabel("Time (s)")
         plt.ylabel("Position (m)")
-        plt.title(f"Position for All Cars, {self.percentage * 100}%")
+        plt.title(f"Position for All Cars, {self.percentage * 100}% Penetration Rate")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
@@ -170,7 +171,7 @@ class Simulation:
                 legend_added["Leader"] = True
             elif isinstance(car.controller, OurController):
                 color = "blue"
-                label = "OurController" if not legend_added["OurController"] else None
+                label = "Experimental Controller" if not legend_added["OurController"] else None
                 legend_added["OurController"] = True
             else:
                 color = "red"
@@ -181,7 +182,7 @@ class Simulation:
 
         plt.xlabel("Time (s)")
         plt.ylabel("Velocity (m/s)")
-        plt.title(f"Velocities for All Cars, {self.percentage * 100}%")
+        plt.title(f"Velocities for All Cars, {self.percentage * 100}% Penetration Rate")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
@@ -203,7 +204,7 @@ class Simulation:
                 legend_added["Leader"] = True
             elif isinstance(car.controller, OurController):
                 color = "blue"
-                label = "OurController" if not legend_added["OurController"] else None
+                label = "Experimental Controller" if not legend_added["OurController"] else None
                 legend_added["OurController"] = True
             else:
                 color = "red"
@@ -213,8 +214,8 @@ class Simulation:
             plt.plot(t, accelerations[i], color=color, label=label)
 
         plt.xlabel("Time (s)")
-        plt.ylabel("Velocity (m/s^2)")
-        plt.title(f"Accelerations for All Cars, {self.percentage * 100}%")
+        plt.ylabel("Acceleration (m/s^2)")
+        plt.title(f"Accelerations for All Cars, {self.percentage * 100}% Penetration Rate")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
@@ -232,7 +233,7 @@ class Simulation:
 
             if isinstance(follower.controller, OurController):
                 color = "blue"
-                label = "OurController" if not legend_added["OurController"] else None
+                label = "Experimental Controller" if not legend_added["OurController"] else None
                 legend_added["OurController"] = True
             else:
                 color = "red"
@@ -244,7 +245,7 @@ class Simulation:
 
         plt.xlabel("Time (s)")
         plt.ylabel("Relative Velocity (m/s)")
-        plt.title(f"Relative Velocities for All Car Pairs, {self.percentage * 100}%")
+        plt.title(f"Relative Velocities for All Car Pairs, {self.percentage * 100}% Penetration Rate")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
@@ -272,7 +273,7 @@ class Simulation:
         )
         plt.xlabel('Time (s)')
         plt.ylabel('Mode')
-        plt.title(f'Controller Mode over Time — All Cars Using OurController, {self.percentage * 100}%')
+        plt.title(f'Controller Mode over Time — All Cars Using OurController, {self.percentage * 100}% Penetration Rate')
         plt.grid(True)
         plt.legend(loc='upper right', bbox_to_anchor=(1.25, 1.0))  # keeps plot clean
         plt.tight_layout()
@@ -305,15 +306,25 @@ class Simulation:
         for median, color in zip(box['medians'], colors):
             median.set_color("black")
 
+        legend_patches = [
+            mpatches.Patch(color="black", label="Leader"),
+        ]
+        if "blue" in colors:
+            legend_patches.append(mpatches.Patch(color="blue", label="Experimental Controller"))
+        if "red" in colors:
+            legend_patches.append(mpatches.Patch(color="red", label="IDM"))
+
+        plt.legend(handles=legend_patches, loc="upper right")
+
         plt.xlabel("Car Index")
-        plt.ylabel("Speed (m/s)")
-        plt.title(f"Speed Distribution per Car, {self.percentage * 100}%")
+        plt.ylabel("Velocity (m/s)")
+        plt.title(f"Velocity Distribution per Car, {self.percentage * 100}% Penetration Rate")
         plt.grid(True, axis='y')
         plt.xticks(range(self.n_cars), [str(i) for i in range(self.n_cars)])
         plt.tight_layout()
         plt.show()
 
-    def compute_metrics(self, hard_brake_threshold=-3.0):
+    def compute_metrics(self, hard_brake_threshold=-3.0, high_jerk_threshold = 0.5):
         """
         Compute key metrics for the simulation, including string stability, crashes, hard braking,
         and macroscopic traffic metrics (flow and density).
@@ -330,6 +341,7 @@ class Simulation:
         hard_brake_times = []
         num_crashes = 0
         first_crash_index = None
+        high_jerk_times = []
 
         # For string stability calculation
         spacing_errors = []
@@ -347,6 +359,11 @@ class Simulation:
             # --- Max jerk ---
             jerk = np.diff(accels) / self.dt
             max_jerk_per_car.append(np.max(np.abs(jerk)))
+            
+             # --- High jerk time (|jerk| >= threshold) ---
+            high_jerk_times.append(
+                np.sum(np.abs(jerk) >= high_jerk_threshold) * self.dt
+            )
 
             # --- Hard brake time ---
             hard_brake_times.append(np.sum(accels <= hard_brake_threshold) * self.dt)
@@ -382,6 +399,8 @@ class Simulation:
             "num_crashes": num_crashes,
             "first_crash_index": first_crash_index,
             "hard_brake_times": hard_brake_times,
+            "high_jerk_times": high_jerk_times,
+            "total_time": len(accels) * self.dt
         }
 
         metrics["final_density"] = self.compute_final_density()
@@ -391,7 +410,7 @@ class Simulation:
         metrics["final_velocity"] = final_velocity
 
         return metrics
-    
+
     def compute_final_density(self, segment_min=200.0, segment_max=300.0, last_time=10.0):
         """
         Compute average density over the last `last_time` seconds for a fixed segment
