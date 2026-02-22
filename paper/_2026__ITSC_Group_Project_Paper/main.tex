@@ -1,0 +1,375 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{graphicx} % Required for inserting images
+\usepackage{mathtools}
+\usepackage{amsfonts}
+\usepackage{subfig}
+\usepackage{caption}
+\usepackage{amsmath}
+\usepackage{xcolor}
+
+
+\title{Traffic State-Based Adaptive Cruise Control}
+
+% \author{\IEEEauthorblockN{Daechul Jung}
+% \IEEEauthorblockA{\textit{Department of Computer Science} \\
+% \textit{Vanderbilt University}\\
+% Nashville, TN, USA \\
+% daechul.jung@vanderbilt.edu}
+% \and
+% \IEEEauthorblockN{Quang Pham}
+% \IEEEauthorblockA{\textit{Department of Computer Science} \\
+% \textit{Vanderbilt University}\\
+% Nashville, TN, USA \\
+% quang.m.pham@vanderbilt.edu}
+% \and
+% \IEEEauthorblockN{Kate Sanborn}
+% \IEEEauthorblockA{\textit{Department of Computer Science} \\
+% \textit{Vanderbilt University}\\
+% Nashville, TN, USA \\
+% kate.l.sanborn@vanderbilt.edu}
+% \and
+% \IEEEauthorblockN{Dan Work}
+% \IEEEauthorblockA{\textit{Department of Civil and Environmental Engineering} \\
+% \textit{Vanderbilt University}\\
+% Nashville, TN, USA \\
+% dan.work@vanderbilt.edu}
+% \and
+% \IEEEauthorblockN{Jonathan Sprinkle}
+% \IEEEauthorblockA{\textit{Department of Computer Science} \\
+% \textit{Vanderbilt University}\\
+% Nashville, TN, USA \\
+% jonathan.sprinkle@vanderbilt.edu}
+% }
+
+\author{
+\IEEEauthorblockN{
+Daechul Jung\IEEEauthorrefmark{1},
+Quang Pham\IEEEauthorrefmark{1},
+Kate Sanborn\IEEEauthorrefmark{1},
+Dan Work\IEEEauthorrefmark{1},
+Jonathan Sprinkle\IEEEauthorrefmark{1}
+}
+
+\IEEEauthorblockA{
+\IEEEauthorrefmark{1}Department of Computer Science, Vanderbilt University\\
+Nashville, TN 37235, USA\\
+jonathan.sprinkle@vanderbilt.edu
+}
+}
+
+
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+The following paper discusses an adaptive cruise controller designed to classify the current state of traffic and adjust the control strategy accordingly. Human driving behavior and standard adaptive cruise controllers can lead to stop-and-go-waves. Our controller classifies the location of the ego vehicle in the wave (no wave, into wave, in wave, out of wave) then adjusts its control strategy accordingly to improve the overall state of traffic. We use a model that has constant time gap, minimum space gap, and a relative velocity term. In this publication, we discuss the three metrics of success: smoother acceleration and deceleration, limiting hard braking events, and string stability. We present results from simulations of following a single vehicle with ROS/Docker, a large scale simulation following synthetic trajectories, and a large scale simulation following NGSIM trajectories. Conclusions and future work for this project are also discussed.
+\end{abstract}
+
+
+\section{Introduction}
+
+% {\color{blue} Add your group members, also and Jonathan and Dan, bring in better analysis of string stability, and provide lots of simulation results with real data to drive behavior.}
+
+Standard Adaptive Cruise Control (ACC) systems typically only react to the immediate vehicle ahead but lack awareness of the larger traffic context. This could lead to amplification of phantom traffic jams, leading to string-unstable conditions, causing hard-braking events, stop-and-go waves and higher probability of rear-end collisions. 
+
+This project addresses the limitation of reactive ACC by developing a Traffic State-Based ACC. Our system aims to do the following:
+
+\begin{itemize}
+
+\item Classify local traffic state: Use only onboard sensor data (velocity, space gap, relative velocity) to identify if the vehicle is in free-flow traffic, entering a traffic wave, inside a wave, or exiting a wave.
+\item Proactively respond: Dynamically adapt the control strategy based on the classified state to ensure string stability, dampen wave propagation, and improve traffic flow efficiency.
+\item Improve passenger comfort: Mitigate hard-braking events and send smoother control actions.
+
+\end{itemize}
+
+\section{Related Works}
+\subsection{Understanding the State of Traffic}
+There are several examples of previous work in understanding the current state of traffic. In \cite{futuretransp3040063}, the authors use connected vehicle data to identify shock waves in traffic, classify their type, and calculate their speed. The categories that they use to classify shock waves are frontal stationary, rear stationary, backward forming, backward recovery, forward forming, and forward recovery. To identify the waves, connected vehicles are driven through the highway, and every 3-5 seconds the GPS, timestamp, speed, and heading information are recorded. After a completed drive, classification and speed calculations are performed algorithmically to analyze wave behavior.
+
+Seo et al. \cite{7313231} use probe vehicles to estimate the state of traffic. These vehicles are equipped with spacing measurement equipment. The vehicles drive through traffic in a randomly distributed manner, collecting spacing and position data. The data is then used to derive fundamental diagram and density information. An Ensemble Kalman Filter then assimilates this information with data from a traffic flow model to provide an estimate of traffic state.
+
+Cao et al. \cite{https://doi.org/10.1049/iet-its.2018.5124} also use probe vehicles with spacing equipment to detect waves in traffic. These vehicles record information including timestamp, position, velocity, and spacing to the preceding vehicle and following vehicle. A single vehicle can identify a local shockwave using its speed, the speed of the preceding vehicle, and the speed of the following vehicle. If three consecutive trajectories decrease in speed, this is a local wave. Local waves identified from several different probe vehicles can be combined into a global wave. Information recorded from several probe vehicles also allows for the calculation of the wave speed.
+
+In these previous works, several vehicles are used to estimate the state of traffic. Some of these analyses cannot be performed in real-time and are instead performed later using the recorded data. For this work, the vehicle only has data from a single vehicle that can be used to estimate the state of traffic.
+
+\subsection{ACC that Adapts to Traffic State}
+Several ACC strategies have been implemented that dynamically adjust based on the state of traffic. In \cite{STERN2018205}, the FollowerStopper controller is used in a ring road experiment. The goal of the controller is to drive at the desired velocity when it is safe to do so and drive at a lesser velocity when necessary. The vehicle successfully dampened waves with peak performance at 7.5 m/s. It also was able to lessen excessive braking and fuel consumption.
+
+Kesting et al. \cite{KESTING2008668} design an ACC system that classifies the state of traffic and then adjusts the control strategy accordingly. The five states that this work identifies are moving in free traffic, approaching an upstream congestion front, moving in congested traffic, leaving the downstream congestion front, and passing infrastructural bottleneck sections (such as road work or intersections). The inputs used in this controller are velocity, space gap, and relative velocity. In addition, GPS data is used to help identify where bottlenecks may occur. A moving average of the ego velocity is used to help determine what traffic state the vehicle is in, though there is a slight delay in state identification. The traffic state is then used to adjust the time gap and two other parameters in the intelligent driver model. In simulation, this strategy improved traffic stability and road capacity.
+
+In \cite{doi:10.1177/0361198118796020}, the time gap setting of the ACC is adjusted based on the traffic conditions. The vehicles running ACC receive information about the flow and speed of different sections of the roadway with vehicle-to-infrastructure communication. The time gap of vehicles is adjusted to maximize flow for the given segment and prevent future congestion. Higher penetration rates of this controller were shown to improve average vehicle delay and total fuel consumption in simulation.
+
+Elmorshedy et al. \cite{doi:10.1177/03611981231152459} use reinforcement learning to optimize traffic flow and minimize delay. The model outputs the ACC desired headway setting. Each state in the RL model includes the average flow and speed of vehicles in a roadway section as measured by a detector at the center of the road segment. The reward function was designed to maximize flow. In simulation, this controller improved network performance.
+
+{\color{red} Stojcsics et al. \cite{s21186089} demonstrate a safe integration of machine learning into an autonomous system. A Deep Neural Network (DNN) classifies system faults into predefined categories, and an Assurance Monitor quantifies the confidence in this classification. A Behavior Tree then executes the corresponding, predetermined safe control strategy, ensuring the learning component only influences high-level decisions, not low-level control signals. This architecture provides a template for enhancing our ACC. A similar LEC could be trained to perform our traffic state classification (e.g., "entering wave," "free-flow"). The Assurance Monitor would validate its output, and our existing state-dependent control laws would remain the safe, predetermined response, leveraging ML for improved accuracy without compromising safety.} (Should make this shorter, just to acknowledge that this approach exists)
+
+All of these strategies have a similar goal as our project: estimating the state of traffic and adjusting the control strategy accordingly to improve the overall state of traffic. Many of these works rely on external information from infrastructure that we will not have access to. Our controller predicts traffic state using only onboard information and still shows traffic state improvement in simulation.
+
+\section{Design}
+Our design has two main components: classification and state-specific control. The goal of classification is to identify the state of overall traffic based on the behavior of the lead vehicle. The state then determines the control strategy that we use in the vehicle.
+
+\subsection{Classification}
+
+Our classification subsystem identifies four different modes of traffic.
+
+\begin{enumerate}
+
+    \item No wave: free flowing traffic or no lead vehicle present
+    \item Into wave: vehicles are slowing down
+    \item In wave: vehicles are moving slowly or stopped
+    \item Out of wave: vehicles are accelerating out of a slow period
+    
+\end{enumerate}
+
+We use a state machine to determine the state. Most of the transition criteria are determined based on the lead vehicle velocity and the lead vehicle acceleration. The state machine is shown in Figure \ref{fig:class_state}.
+
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=0.7\linewidth]{figures/ITSC 2026 Group Project Classification.pdf}
+    \caption{Classification state machine. $s_n$ is the space gap. $v_l$ is the lead vehicle velocity. $v_{l, avg}$ is the moving average of the lead vehicle velocity. $a_{l,avg}$ is the moving average of the lead vehicle acceleration. $v_{slow}$ (10 m/s) and $v_{fast}$ (13.5 m/s) are tunable transition thresholds.}
+    \label{fig:class_state}
+\end{figure*}
+
+The initial state is determined by the lead vehicle velocity (ego velocity plus relative velocity). If the lead velocity is greater than the no wave velocity (set to 13.5 m/s, can be changed as a parameter) or the lead distance is greater than 200 meters, the initial state is set to no wave. Otherwise, the state is set to in wave.
+
+The mode transitions from no wave to into wave if the lead vehicle is decelerating and the lead velocity is less than the no wave velocity.
+
+There are three possible transitions out of the into wave mode. If the lead velocity decreases below the wave velocity (set to 10 m/s, can be changed as a parameter), the mode transitions to in wave. Another transition is to the out of wave mode. This transition is taken if the lead vehicle has a moving average acceleration greater than 0.25 m/s\textsuperscript{2}. The last transition is to the no wave mode. If the lead distance is greater than 200 meters (when the lead car disappears, for instance), the mode switches to no wave.
+
+The in wave mode has two transitions. If the lead acceleration moving average is greater than 0.5 m/s\textsuperscript{2} and the lead velocity is greater than the wave velocity, the mode transitions to out of wave. If the lead distance is greater than 200 meters, the mode switches to no wave.
+
+The out of wave mode has two transitions. If the velocity is greater than the no wave velocity or if the lead distance is greater than 200 meters, the mode transitions to no wave. If the lead acceleration moving average is less than -0.25 m/s\textsuperscript{2}, the mode switches to into wave.
+
+
+\subsection{State-Specific Control Strategies}
+
+The command acceleration strategy is selected by the classification mode. All four modes use the same equation with different parameters.
+
+\begin{equation}
+    \frac{dv_n(t)}{dt} = \alpha (s_n(t)-(\tau v_n(t) + s_{min})) + k \Delta v
+\end{equation}
+
+The parameters for each mode are shown in Table \ref{tab:mode_param}.
+
+\begin{table}[htbp]
+\caption{Mode parameters for control}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+Mode & $\alpha$ & $\tau$ & $s_{min}$ & $k$ \\
+\hline
+No Wave & 0.615 & 2.266 & 10 & 0.221 \\
+\hline
+Into Wave & 0.700 & 2.400 & 10 & 0.230 \\
+\hline
+In Wave & 0.646 & 2.253 & 10 & 0.213 \\
+\hline
+Out of Wave & 1.100 & 2.400 & 10 & 0.240 \\
+\hline
+\end{tabular}
+\label{tab:mode_param}
+\end{center}
+\end{table}
+
+The no wave parameters are chosen to cruise to the desired speed with gentle distance control. The into wave mode parameters allow the controller to aggressively reduce the speed to match traffic. The in wave parameters are designed to maintain stable following with conservative gains. The out of wave mode parameters allow the vehicle to rapidly accelerate away from slow traffic.
+
+The no wave mode also ensures that the vehicle never exceeds a maximum velocity (35 m/s or whatever value is set with a parameter). This is to ensure that the vehicle does not continue accelerating forever if there is no lead vehicle.
+
+\section{Metrics for Success}
+
+The three metrics that we wanted to test for our controller performance were smooth acceleration and deceleration, limiting hard braking, and string stability.
+
+We evaluated three different simulations based on these metrics: a ROS and Docker simulation, a large-scale simulation using synthetic trajectories, and a large-scale simulation using trajectories from NGSIM \cite{FHWA_NGSIM_2006} data. The ROS and Docker simulation simulates a single vehicle following a recorded trajectory from real vehicle data. The large-scale simulation using synthetic trajectories simulates a fleet of 25 vehicles. The lead vehicle has synthetic behavior, such as a constant speed, hard brake, or oscillation. Different penetration rates of the experimental controller and the intelligent driver model (IDM) \cite{PhysRevE.62.1805} are tested. The large-scale NGSIM simulation also simulates a fleet of 25 vehicles. In this simulation, the lead vehicle trajectory comes from recorded vehicle behavior in the NGSIM dataset. Different penetration rates of the experimental controller and the IDM are tested. The following section describes the metrics and how they were analyzed in each of the simulations.
+
+\subsection{Smoother Acceleration and Deceleration}
+
+For smooth acceleration and deceleration, we decided to evaluate jerk. We wanted the derivative of acceleration to remain in a comfortable range.
+
+\begin{equation}
+    \left| \frac{da(t)}{dt} \right| < 0.5 m/s^3 
+\end{equation}
+
+% {\color{red} We evaluated the performance in terms of jerk for the multivehicle Simulink simulations and the large-scale simulations. The multivehicle Simulink simulations print a warning for every time step where this constraint is violated. In the large-scale simulations, the jerk is also calculated.}
+
+
+In the ROS/Docker simulation, we compute jerk from the ego commanded-acceleration and evaluate the fraction of time \(\left| \frac{da(t)}{dt} \right|\) exceeds the comfort threshold \(0.5~\mathrm{m/s^3}\).
+
+
+{\color{red} TO DO large-scale synthetic}
+
+For the large-scale NGSIM simulations, we evaluate the average percentage of follower vehicle time spent experiencing high jerk events across different penetration rates of the experimental controller.
+
+\subsection{Limit Hard Braking Events}
+
+To evaluate the hard braking, we checked the amount of time with a command acceleration of -3.0 m/s\textsuperscript{2}. 
+% {\color{red}In the multivehicle simulations, a warning is printed for every time step where this is violated. For the ROS/Docker simulations, the in-vehicle test, and the large-scale simulations, we graph all the command acceleration values over time and qualitatively evaluate the amount of time with the minimum acceleration value.}
+In the ROS/Docker simulation, we utilize the command acceleration, we quantify and evaluate hard braking as the percentage of samples where \(a_{\mathrm{cmd}} \le -3.0~\mathrm{m/s^2}\).
+
+{\color{red} TO DO large-scale synthetic}
+
+To evaluate hard braking in the NGSIM simulations, we evaluate the average percentage of follower vehicle time spent experiencing large deceleration across different penetration rates of the experimental controller.
+
+\subsection{String Stability}
+
+Another goal for this controller was not to magnify disturbances through a platoon of vehicles. 
+% {\color{red} We mainly evaluated our performance on this metric through the large-scale simulations. In the synthetic data tests, we simulate a line of 25 vehicles where the first vehicle has behavior specified by a function. For these, we calculate string stability as the ratio of velocity variance of all the cars at the end of the simulation (last 20\%) versus the beginning of the simulation (first 20\%). The other large-scale simulations follow an NGSIM trajectory. For these simulations, we graph the velocity distributions from the beginning of the line of cars to the end and evaluate whether the range of velocity values increases or decreases.}
+
+In ROS/Docker simulation, we evaluate string stability by comparing disturbance magnitudes such as \(\sigma(v_{\mathrm{ego}})/\sigma(v_{\mathrm{lead}})\) and calculating the relative speed \(v_{\mathrm{ego}}-v_{\mathrm{lead}}\) to confirm disturbances are not amplified.
+
+{\color{red} TO DO large-scale synthetic}
+
+In the NGSIM simulations, we plot the distribution of velocities of all the vehicles in the fleet to determine if large variations propagate backwards.
+
+\section{Results}
+
+\subsection{ROS and Docker Simulation}
+The following section discusses the ROS/Docker simulation results for the three success metrics: smooth acceleration/deceleration (jerk), limiting hard braking, and string stability. Figure~\ref{fig:ros-jerk} shows the jerk time history computed from the commanded acceleration, and Figure~\ref{fig:ros-jerk-dist} shows the distribution of \(|j|\). The jerk remains near zero for most of the run, indicating generally smooth control actions, but exhibits brief threshold violations during an initial transient and a later adjustment interval. These transient spikes create a long-tailed \(|j|\) distribution and suggest that comfort can be improved by reducing abrupt changes during controller engagement and large corrections.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/jerk_distribution.png}
+    \caption{ROS/Docker simulation jerk results: time history and \(|j|\) distribution.}
+    \label{fig:ros-jerk}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/jerk_distribution2.png}
+    \caption{ROS/Docker simulation jerk distribution: histogram of \(|j|\) distribution.}
+    \label{fig:ros-jerk-dist}
+\end{figure}
+Figure~\ref{fig:ros-hard-brake} shows the commanded acceleration \(a_{\mathrm{cmd}}\) over time with the hard-braking threshold marked. Across the entire ROS/Docker run, the commanded acceleration stays well above the hard-braking region, indicating that the controller avoids harsh deceleration and remains in a moderate braking regime. Overall, the ROS/Docker results demonstrate that the controller satisfies the hard-braking safety objective in this single-lead/single-follower scenario.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/limit_hard_breaking.png}
+    \caption{ROS/Docker simulation commanded acceleration with hard-braking threshold.}
+    \label{fig:ros-hard-brake}
+\end{figure}
+
+To evaluate string stability in the ROS/Docker setting, which contains a single lead--ego pair rather than a full platoon, we use a single-follower based on the propagation of speed disturbances from the lead vehicle to the ego vehicle. Figure~\ref{fig:ros-string} compares the lead and ego velocity traces and summarizes the relative speed behavior. The ego vehicle does not exhibit larger oscillations than the lead vehicle, and speed disturbances are not amplified in the follower, indicating stable tracking without sustained growth in oscillations. Under this proxy metric, the ROS/Docker results are consistent with string-stable behavior for the tested scenario.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/string_stability.png}
+    \caption{ROS/Docker simulation string-stability results using lead and ego velocity signals.}
+    \label{fig:ros-string}
+\end{figure}
+
+
+\subsection{Synthetic Trajectory Simulation}
+
+{\color{red} TO DO}
+
+\subsection{NGSIM Trajectory Simulation}
+
+The following section discusses the results of following an NGSIM trajectory with varying penetration rates of the experimental controller. Figure \ref{fig:ngsim-0-vel} shows the velocities of the fleet when all following vehicles use the IDM. Figure \ref{fig:ngsim-0-vel-dist} shows the distribution of the velocities of all vehicles. It is clear that by itself, the IDM propagates and amplifies disturbances backwards in the lane of vehicles. The traffic wave amplifies backwards. Even though the leader never comes to a full stop, several following vehicles are forced to stop.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/ID 350 0 percent velocities.png}
+    \caption{NGSIM simulation fleet velocities, 0\% penetration}
+    \label{fig:ngsim-0-vel}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/ID 350 0 percent velocity distrbution.png}
+    \caption{NGSIM simulation fleet velocity distributions, 0\% penetration}
+    \label{fig:ngsim-0-vel-dist}
+\end{figure}
+
+Figure \ref{fig:ngsim-50-vel} shows the velocities of the fleet when half of the following vehicles use the IDM and the rest run the experimental controller. Figure \ref{fig:ngsim-50-vel-dist} shows the distribution of the velocities of all vehicles. While the disturbance is still propagated some in the fleet, the amplification is less. The range of velocities of the experimental controller is typically less than the range of the velocities of the preceding vehicle. None of the vehicles are forced to halt entirely.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/ID 350 50 percent velocities.png}
+    \caption{NGSIM simulation fleet velocities, 50\% penetration}
+    \label{fig:ngsim-50-vel}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/ID 350 50 percent velocity distrbution.png}
+    \caption{NGSIM simulation fleet velocity distributions, 50\% penetration}
+    \label{fig:ngsim-50-vel-dist}
+\end{figure}
+
+Figure \ref{fig:ngsim-50-vel} shows the velocities of the fleet when all vehicles use the experimental controller. Figure \ref{fig:ngsim-50-vel-dist} shows the distribution of the velocities of all vehicles. Disturbances are dampened. Also, the velocity distribution shrinks backwards in the line of vehicles.
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/ID 350 100 percent velocities.png}
+    \caption{NGSIM simulation fleet velocities, 100\% penetration}
+    \label{fig:ngsim-100-vel}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/ID 350 100 percent velocity distrbution.png}
+    \caption{NGSIM simulation fleet velocity distributions, 100\% penetration}
+    \label{fig:ngsim-100-vel-dist}
+\end{figure}
+
+In Figure \ref{fig:ngsim-jerk}, the average time that follower vehicles experience high jerk is shown. Overall, high jerk events increase as the penetration rate increases.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/ID 350 large jerk.png}
+    \caption{NGSIM simulation jerk events at varying penetration rates}
+    \label{fig:ngsim-jerk}
+\end{figure}
+
+The plot in Figure \ref{fig:ngsim-large-brake} shows how hard braking time changes at different penetration rates. With only the IDM, no hard braking was required, and the hard braking did not increase as the penetration increased.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/ID 350 large brake.png}
+    \caption{NGSIM simulation hard braking events at varying penetration rates}
+    \label{fig:ngsim-large-brake}
+\end{figure}
+
+\section{Conclusions}
+
+\subsection{Evaluation of Metrics}
+
+\subsubsection{Smoother Acceleration and Deceleration}
+
+The jerk signal remained small for much of the run, but showed clear threshold violations during transient periods, indicating that smooth acceleration/deceleration was not consistently maintained; therefore, this success metric was not fully achieved.
+
+{\color{red} TO DO large synthetic}
+
+In the NGSIM simulations, high jerk increased with increasing penetration rates, likely due to abrupt acceleration changes at mode switches. This goal was not accomplished.
+
+\subsubsection{Limit Hard Braking Events}
+
+The commanded acceleration never entered the hard-braking region over the recorded run, demonstrating that the controller avoided harsh deceleration; this success metric was achieved.
+
+
+{\color{red} TO DO large synthetic}
+
+The NGSIM simulations showed that adding the number of vehicles running the experimental controller did not increase hard braking. This metric was achieved.
+
+\subsubsection{String Stability}
+
+Using a single-follower proxy, the ego vehicle did not amplify lead-vehicle speed disturbances and the relative speed error stayed bounded, suggesting stable following behavior, hence the success metric was achieved.
+
+{\color{red} TO DO large synthetic}
+
+In the distribution plots for the NGSIM, it is clear that the experimental controller avoids amplifying disturbances, showing that the new controller is string stable. The goal of string stability was accomplished.
+
+\subsection{Future Work}
+
+ For future work, the control parameters can be tuned to reduce jerk. The main source of jerk is likely abrupt mode switching, so smoothing the transition may eliminate these rapid changes in acceleration.
+ It may also be beneficial to tune parameters across all modes using machine learning techniques. Using data-driven approaches to optimize across the three metrics may improve performance and help improve overall traffic flow.
+
+\bibliographystyle{ieeetr}
+\bibliography{References}
+
+\end{document}
