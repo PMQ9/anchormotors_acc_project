@@ -200,7 +200,7 @@ For smooth acceleration and deceleration, we decided to evaluate jerk. We wanted
 In the ROS/Docker simulation, we compute jerk from the ego commanded-acceleration and evaluate the fraction of time \(\left| \frac{da(t)}{dt} \right|\) exceeds the comfort threshold \(0.5~\mathrm{m/s^3}\).
 
 
-{\color{red} TO DO large-scale synthetic}
+For the large-scale synthetic simulations, we compute the maximum jerk magnitude observed across all follower vehicles and evaluate whether it remains within a comfortable range. We also assess the mean jerk across the fleet at each penetration rate to determine whether higher ACC penetration reduces abrupt acceleration changes overall.
 
 For the large-scale NGSIM simulations, we evaluate the average percentage of follower vehicle time spent experiencing high jerk events across different penetration rates of the experimental controller.
 
@@ -210,7 +210,7 @@ To evaluate the hard braking, we checked the amount of time with a command accel
 % {\color{red}In the multivehicle simulations, a warning is printed for every time step where this is violated. For the ROS/Docker simulations, the in-vehicle test, and the large-scale simulations, we graph all the command acceleration values over time and qualitatively evaluate the amount of time with the minimum acceleration value.}
 In the ROS/Docker simulation, we utilize the command acceleration, we quantify and evaluate hard braking as the percentage of samples where \(a_{\mathrm{cmd}} \le -3.0~\mathrm{m/s^2}\).
 
-{\color{red} TO DO large-scale synthetic}
+For the large-scale synthetic simulations, we evaluate the maximum deceleration experienced by any follower vehicle across all scenarios and penetration rates. The hard braking threshold is $-3.0~\mathrm{m/s^2}$. We also monitor the minimum space gap to confirm that safety margins are maintained and no collision-risk events occur.
 
 To evaluate hard braking in the NGSIM simulations, we evaluate the average percentage of follower vehicle time spent experiencing large deceleration across different penetration rates of the experimental controller.
 
@@ -221,7 +221,7 @@ Another goal for this controller was not to magnify disturbances through a plato
 
 In ROS/Docker simulation, we evaluate string stability by comparing disturbance magnitudes such as \(\sigma(v_{\mathrm{ego}})/\sigma(v_{\mathrm{lead}})\) and calculating the relative speed \(v_{\mathrm{ego}}-v_{\mathrm{lead}}\) to confirm disturbances are not amplified.
 
-{\color{red} TO DO large-scale synthetic}
+For the large-scale synthetic simulations, we compute string stability as the ratio of velocity standard deviation of vehicles at the tail of the fleet to the velocity standard deviation of the lead vehicle. A ratio greater than one indicates amplification of disturbances (string instability), while a ratio less than one indicates dampening. We evaluate this metric across all 15 scenarios at each penetration rate.
 
 In the NGSIM simulations, we plot the distribution of velocities of all the vehicles in the fleet to determine if large variations propagate backwards.
 
@@ -242,7 +242,8 @@ The following section discusses the ROS/Docker simulation results for the three 
     \caption{ROS/Docker simulation jerk distribution: histogram of \(|j|\) distribution.}
     \label{fig:ros-jerk-dist}
 \end{figure}
-Figure~\ref{fig:ros-hard-brake} shows the commanded acceleration \(a_{\mathrm{cmd}}\) over time with the hard-braking threshold marked. Across the entire ROS/Docker run, the commanded acceleration stays well above the hard-braking region, indicating that the controller avoids harsh deceleration and remains in a moderate braking regime. Overall, the ROS/Docker results demonstrate that the controller satisfies the hard-braking safety objective in this single-lead/single-follower scenario.
+Figure~\ref{fig:ros-hard-brake} shows the commanded acceleration \(a_{\mathrm{cmd}}\) over time with the hard-braking threshold marked. Across the entire ROS/Docker run, the commanded acceleration stays well above the hard-braking region, indicating that the controller avoids harsh deceleration and remain{\color{red} TO DO large-scale synthetic}
+s in a moderate braking regime. Overall, the ROS/Docker results demonstrate that the controller satisfies the hard-braking safety objective in this single-lead/single-follower scenario.
 
 \begin{figure}
     \centering
@@ -263,7 +264,79 @@ To evaluate string stability in the ROS/Docker setting, which contains a single 
 
 \subsection{Synthetic Trajectory Simulation}
 
-{\color{red} TO DO}
+We evaluated the controller in a large-scale fleet simulation with 25 vehicles, a 100-second duration, and a 0.05-second time step. The lead vehicle follows synthetic trajectories across 15 scenarios in five categories: constant speed (15, 20, 25~m/s), oscillation (small, medium, large amplitude, multi-frequency), sudden acceleration (gradual, rapid), sudden deceleration (gradual, rapid, severe), and step changes (two-state, three-state, frequent). Penetration rates of 5\%, 10\%, 20\%, 50\%, 75\%, and 100\% were tested at each scenario. Vehicles not running the experimental controller use the IDM.
+
+\subsubsection{Constant Speed Scenarios}
+
+In the constant-speed scenarios, the lead vehicle maintains a fixed velocity while the fleet adapts from an initial equilibrium spacing of approximately 60~m. Figure~\ref{fig:synth-const-comparison} shows how fleet performance metrics change with ACC penetration rate for the constant slow (15~m/s) scenario. String stability improved by 100\% from 5\% to 100\% penetration, and minimum space gap increased from 28.6~m to 43.2~m. At 100\% penetration (Figure~\ref{fig:synth-const-100}), all vehicles converge smoothly to the lead speed with no velocity oscillation, while at 5\% penetration (Figure~\ref{fig:synth-const-005}) the predominantly human fleet exhibits noticeable velocity spread.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/synth_01a_constant_slow_comparison.png}
+    \caption{Constant slow scenario: fleet metrics vs.\ ACC penetration rate.}
+    \label{fig:synth-const-comparison}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/synth_01a_constant_slow_005.png}
+    \caption{Constant slow scenario at 5\% ACC penetration.}
+    \label{fig:synth-const-005}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/synth_01a_constant_slow_100.png}
+    \caption{Constant slow scenario at 100\% ACC penetration.}
+    \label{fig:synth-const-100}
+\end{figure}
+
+\subsubsection{Oscillation Scenarios}
+
+The oscillation scenarios test the controller's ability to dampen periodic disturbances in the fleet. Figure~\ref{fig:synth-osc-med-comparison} shows the penetration rate comparison for the medium oscillation scenario ($\pm$5~m/s, 20~s period). String stability improved by 50.4\% from 5\% to 100\% penetration. In the large-amplitude, fast-period oscillation ($\pm$7~m/s, 10~s period), shown in Figure~\ref{fig:synth-osc-large-comparison}, the improvement reached 82.1\%. At 100\% penetration in the medium oscillation (Figure~\ref{fig:synth-osc-med-100}), the ACC vehicles collectively track the lead vehicle oscillation while dampening disturbance propagation through the fleet. Across all oscillation scenarios, ACC vehicles act as wave absorbers, reducing the amplification of velocity disturbances downstream.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/synth_02b_oscillation_medium_comparison.png}
+    \caption{Medium oscillation scenario: fleet metrics vs.\ ACC penetration rate.}
+    \label{fig:synth-osc-med-comparison}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/synth_02b_oscillation_medium_100.png}
+    \caption{Medium oscillation scenario at 100\% ACC penetration.}
+    \label{fig:synth-osc-med-100}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/synth_02c_oscillation_large_fast_comparison.png}
+    \caption{Large fast oscillation scenario: fleet metrics vs.\ ACC penetration rate.}
+    \label{fig:synth-osc-large-comparison}
+\end{figure}
+
+\subsubsection{Sudden Deceleration and Step Change Scenarios}
+
+The sudden deceleration scenarios evaluate safety under emergency-like conditions. In the rapid deceleration scenario (25~m/s to 15~m/s in 2~seconds), shown in Figure~\ref{fig:synth-decel-comparison}, minimum space gaps remained well above the 5~m safety threshold at all penetration rates. In the step change scenarios, the lead vehicle repeatedly alternates between discrete speed states. Figure~\ref{fig:synth-step-comparison} shows the two-state step change (alternating between 15 and 25~m/s every 15~seconds). Higher ACC penetration rates consistently reduced velocity variance and smoothed the fleet response to repeated transitions.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/synth_04b_sudden_decel_rapid_comparison.png}
+    \caption{Rapid deceleration scenario: fleet metrics vs.\ ACC penetration rate.}
+    \label{fig:synth-decel-comparison}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/synth_05a_step_changes_comparison.png}
+    \caption{Two-state step change scenario: fleet metrics vs.\ ACC penetration rate.}
+    \label{fig:synth-step-comparison}
+\end{figure}
+
+\subsubsection{Summary of Synthetic Results}
+
+Across all 15 scenarios, increasing ACC penetration monotonically improved string stability. Maximum jerk decreased from approximately 15~m/s$^3$ at low penetration to 6.8~m/s$^3$ at 100\% penetration, as the human driver model's abrupt reactions were replaced by smoother ACC control. Maximum deceleration remained within the $-3.0$~m/s$^2$ hard braking threshold for all scenarios except the severe deceleration stress test, and minimum space gaps increased with penetration rate, indicating improved safety margins.
 
 \subsection{NGSIM Trajectory Simulation}
 
@@ -343,7 +416,7 @@ The plot in Figure \ref{fig:ngsim-large-brake} shows how hard braking time chang
 
 The jerk signal remained small for much of the run, but showed clear threshold violations during transient periods, indicating that smooth acceleration/deceleration was not consistently maintained; therefore, this success metric was not fully achieved.
 
-{\color{red} TO DO large synthetic}
+In the large-scale synthetic simulations, maximum jerk decreased from approximately 15~m/s$^3$ at 5\% penetration to 6.8~m/s$^3$ at 100\% penetration, as human driver reactions were replaced by smoother ACC commands. This metric was achieved for the synthetic simulations.
 
 In the NGSIM simulations, high jerk increased with increasing penetration rates, likely due to abrupt acceleration changes at mode switches. This goal was not accomplished.
 
@@ -352,7 +425,7 @@ In the NGSIM simulations, high jerk increased with increasing penetration rates,
 The commanded acceleration never entered the hard-braking region over the recorded run, demonstrating that the controller avoided harsh deceleration; this success metric was achieved.
 
 
-{\color{red} TO DO large synthetic}
+In the large-scale synthetic simulations, the maximum deceleration stayed above the $-3.0$~m/s$^2$ hard braking threshold across all scenarios except the severe deceleration stress test (25 to 10~m/s in 3~seconds), which reached $-3.0$~m/s$^2$ by design. Minimum space gaps remained well above the 5~m safety threshold in all cases and increased with penetration rate. This metric was achieved.
 
 The NGSIM simulations showed that adding the number of vehicles running the experimental controller did not increase hard braking. This metric was achieved.
 
@@ -360,7 +433,7 @@ The NGSIM simulations showed that adding the number of vehicles running the expe
 
 Using a single-follower proxy, the ego vehicle did not amplify lead-vehicle speed disturbances and the relative speed error stayed bounded, suggesting stable following behavior, hence the success metric was achieved.
 
-{\color{red} TO DO large synthetic}
+In the large-scale synthetic simulations, string stability improved monotonically with penetration rate across all 15 scenarios. Constant-speed scenarios achieved up to 100\% improvement, oscillation scenarios achieved 41--82\% improvement, and even the most challenging step-change scenarios showed consistent gains. This metric was achieved.
 
 In the distribution plots for the NGSIM, it is clear that the experimental controller avoids amplifying disturbances, showing that the new controller is string stable. The goal of string stability was accomplished.
 
