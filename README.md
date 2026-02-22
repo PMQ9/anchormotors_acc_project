@@ -35,18 +35,38 @@ Standard ACC systems react only to the immediate vehicle ahead, amplifying phant
 
 ### Control Equation
 
+All modes share a common distance-based control law with state-specific parameters:
+
 ```
-dv/dt = α(s - (τv + s_min)) + k·Δv
+a_dist = α(s - (τv + s_min)) + k·Δv
 ```
 
 <img src="doc/img/control_algorithm.png" alt="Control Algorithm" width="50%"/>
 
 | Mode | α | τ | s_min | k |
 |------|---|---|-------|---|
-| No Wave | 0.15 | 2.0 | 10 | 0.424 |
-| Into Wave | 0.7 | 2.4 | 10 | 0.23 |
-| In Wave | 0.2 | 2.5 | 10 | 0.35 |
-| Out of Wave | 1.1 | 2.4 | 10 | 0.24 |
+| No Wave | 0.615 | 2.266 | 10 | 0.221 |
+| Into Wave | 0.700 | 2.400 | 10 | 0.230 |
+| In Wave | 0.646 | 2.253 | 10 | 0.213 |
+| Out of Wave | 1.100 | 2.400 | 10 | 0.240 |
+
+#### No Wave Mode: Dynamic Velocity Limiting
+
+The No Wave mode adds a dynamic velocity-limiting layer on top of the distance-based control. A safe velocity is computed from the kinematic stopping distance:
+
+```
+v_safe = v_lead + sqrt(2 · |a_max_decel| · max(0, gap_error))
+v_des  = min(v_max, v_safe)
+```
+
+A soft limiter attenuates positive acceleration as ego velocity approaches `v_des`:
+
+```
+λ       = min(1, sat(v_des - v_ego, -6, 3) / 3)
+a_cmd   = min(λ · a_dist, a_dist)
+```
+
+The `min()` ensures braking always passes through at full magnitude, while acceleration is smoothly reduced near the speed limit. This prevents runaway acceleration in free-flow and ensures safe approach speeds when the gap is small.
 
 ---
 

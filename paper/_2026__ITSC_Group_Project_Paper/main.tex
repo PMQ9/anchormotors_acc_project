@@ -148,7 +148,7 @@ The out of wave mode has two transitions. If the velocity is greater than the no
 
 \subsection{State-Specific Control Strategies}
 
-The command acceleration strategy is selected by the classification mode. All four modes use the same equation with different parameters.
+The command acceleration strategy is selected by the classification mode. The into wave, in wave, and out of wave modes share a common linear control law with state-specific parameters:
 
 \begin{equation}
     \frac{dv_n(t)}{dt} = \alpha (s_n(t)-(\tau v_n(t) + s_{min})) + k \Delta v
@@ -176,9 +176,35 @@ Out of Wave & 1.100 & 2.400 & 10 & 0.240 \\
 \end{center}
 \end{table}
 
-The no wave parameters are chosen to cruise to the desired speed with gentle distance control. The into wave mode parameters allow the controller to aggressively reduce the speed to match traffic. The in wave parameters are designed to maintain stable following with conservative gains. The out of wave mode parameters allow the vehicle to rapidly accelerate away from slow traffic.
+The into wave mode parameters allow the controller to aggressively reduce speed to match traffic. The in wave parameters are designed to maintain stable following with conservative gains. The out of wave mode parameters allow the vehicle to rapidly accelerate away from slow traffic.
 
-The no wave mode also ensures that the vehicle never exceeds a maximum velocity (35 m/s or whatever value is set with a parameter). This is to ensure that the vehicle does not continue accelerating forever if there is no lead vehicle.
+\subsubsection{No Wave Mode: Dynamic Velocity Limiting}
+
+The no wave mode uses the same distance-based control law but adds a dynamic velocity-limiting layer. First, a safe velocity is computed from the kinematic stopping distance equation:
+
+\begin{equation}
+    v_{safe} = v_{lead} + \sqrt{2 \left| a_{max,decel} \right| \cdot \max(0,\; e_{gap})}
+\end{equation}
+
+where $e_{gap} = s_n - s_{min} - \tau \cdot v_n$ is the gap error and $a_{max,decel} = -3.0$~m/s$^2$ is the maximum deceleration. The effective desired velocity is then:
+
+\begin{equation}
+    v_{des} = \min(v_{max},\; v_{safe})
+\end{equation}
+
+A soft velocity limiter attenuates the distance-based acceleration as the ego velocity approaches the desired velocity:
+
+\begin{equation}
+    \lambda = \min\!\left(1,\; \frac{1}{3}\,\text{sat}(v_{des} - v_n,\, -6,\, 3)\right)
+\end{equation}
+
+The final commanded acceleration is:
+
+\begin{equation}
+    a_{cmd} = \min(\lambda \cdot a_{dist},\; a_{dist})
+\end{equation}
+
+where $a_{dist}$ is the saturated output of the linear control law. The $\min$ operator ensures that braking commands always pass through at full magnitude regardless of $\lambda$, while positive acceleration is smoothly attenuated as the vehicle approaches $v_{des}$. This prevents the vehicle from exceeding $v_{max}$ in free-flow conditions and ensures safe approach speeds when the gap error is small.
 
 \section{Metrics for Success}
 
@@ -242,8 +268,7 @@ The following section discusses the ROS/Docker simulation results for the three 
     \caption{ROS/Docker simulation jerk distribution: histogram of \(|j|\) distribution.}
     \label{fig:ros-jerk-dist}
 \end{figure}
-Figure~\ref{fig:ros-hard-brake} shows the commanded acceleration \(a_{\mathrm{cmd}}\) over time with the hard-braking threshold marked. Across the entire ROS/Docker run, the commanded acceleration stays well above the hard-braking region, indicating that the controller avoids harsh deceleration and remain{\color{red} TO DO large-scale synthetic}
-s in a moderate braking regime. Overall, the ROS/Docker results demonstrate that the controller satisfies the hard-braking safety objective in this single-lead/single-follower scenario.
+Figure~\ref{fig:ros-hard-brake} shows the commanded acceleration \(a_{\mathrm{cmd}}\) over time with the hard-braking threshold marked. Across the entire ROS/Docker run, the commanded acceleration stays well above the hard-braking region, indicating that the controller avoids harsh deceleration and remains in a moderate braking regime. Overall, the ROS/Docker results demonstrate that the controller satisfies the hard-braking safety objective in this single-lead/single-follower scenario.
 
 \begin{figure}
     \centering
