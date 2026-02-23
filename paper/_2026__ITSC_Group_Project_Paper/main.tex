@@ -66,7 +66,7 @@ jonathan.sprinkle@vanderbilt.edu
 \maketitle
 
 \begin{abstract}
-The following paper discusses an adaptive cruise controller designed to classify the current state of traffic and adjust the control strategy accordingly. Human driving behavior and standard adaptive cruise controllers can lead to stop-and-go-waves. Our controller classifies the location of the ego vehicle in the wave (no wave, into wave, in wave, out of wave) then adjusts its control strategy accordingly to improve the overall state of traffic. We use a model that has constant time gap, minimum space gap, and a relative velocity term. In this publication, we discuss the three metrics of success: smoother acceleration and deceleration, limiting hard braking events, and string stability. We present results from simulations of following a single vehicle with ROS/Docker, a large scale simulation following synthetic trajectories, and a large scale simulation following NGSIM trajectories. Conclusions and future work for this project are also discussed.
+Stop-and-go (phantom) traffic waves can be amplified by conventional adaptive cruise control (ACC) that reacts only to the immediate leader. We propose a traffic-wave phase–aware ACC that uses only onboard car-following signals (ego speed, gap, relative speed) to classify whether the ego vehicle is outside a wave, entering, inside, or exiting a stop-and-go wave, and then switches control parameters to damp disturbances while maintaining safety. In 25-vehicle simulations across 15 synthetic leader scenarios, increasing penetration of the proposed controller yields monotonic string-stability improvement and reduces peak acceleration transients (e.g., maximum jerk decreases from ~15 to ~6.8 m/s³ at full penetration). We further evaluate mixed-penetration platoons using NGSIM leader trajectories, showing reduced disturbance amplification in fleet speed distributions, but also identifying jerk increases at higher penetration due to abrupt mode transitions. These results motivate transition-smoothing as future work to preserve wave damping while improving comfort. Conclusions and future work for this project are also discussed.
 \end{abstract}
 
 
@@ -74,7 +74,7 @@ The following paper discusses an adaptive cruise controller designed to classify
 
 % {\color{blue} Add your group members, also and Jonathan and Dan, bring in better analysis of string stability, and provide lots of simulation results with real data to drive behavior.}
 
-Standard Adaptive Cruise Control (ACC) systems typically only react to the immediate vehicle ahead but lack awareness of the larger traffic context. This could lead to amplification of phantom traffic jams, leading to string-unstable conditions, causing hard-braking events, stop-and-go waves and higher probability of rear-end collisions. 
+Standard Adaptive Cruise Control (ACC) systems typically only react to the immediate vehicle ahead but lack awareness of the larger traffic context. This could lead to amplification of phantom traffic jams, leading to string-unstable conditions, causing hard-braking events, stop-and-go waves and higher probability of rear-end collisions. In this paper, a “traffic wave” refers to a stop-and-go (phantom-jam) phenomenon that propagates upstream as a moving transition between higher-speed and lower-speed traffic, characterized locally by a sustained low-speed region and distinct entry/exit phases experienced by individual drivers.
 
 This project addresses the limitation of reactive ACC by developing a Traffic State-Based ACC. Our system aims to do the following:
 
@@ -83,12 +83,14 @@ This project addresses the limitation of reactive ACC by developing a Traffic St
 \item Classify local traffic state: Use only onboard sensor data (velocity, space gap, relative velocity) to identify if the vehicle is in free-flow traffic, entering a traffic wave, inside a wave, or exiting a wave.
 \item Proactively respond: Dynamically adapt the control strategy based on the classified state to ensure string stability, dampen wave propagation, and improve traffic flow efficiency.
 \item Improve passenger comfort: Mitigate hard-braking events and send smoother control actions.
-
 \end{itemize}
+
+(This is newly added, needs review) This paper proposes a traffic state–based adaptive cruise control (ACC) strategy that mitigates stop-and-go traffic waves using only onboard car-following measurements. Our main contributions are: (1) a lightweight, real-time wave-phase classifier that labels the ego vehicle as outside, entering, inside, or exiting a stop-and-go wave based solely on ego speed, gap, and relative speed; (2) a mode-dependent ACC law that schedules control parameters across these phases to reduce disturbance amplification while maintaining safety constraints; and (3) a mixed-traffic evaluation using both synthetic leader scenarios and NGSIM-based leader trajectories, including penetration-rate sweeps and metrics for string stability and comfort (e.g., acceleration/jerk statistics) to quantify benefits and identify limitations due to mode switching.
+
 
 \section{Related Works}
 \subsection{Understanding the State of Traffic}
-There are several examples of previous work in understanding the current state of traffic. In \cite{futuretransp3040063}, the authors use connected vehicle data to identify shock waves in traffic, classify their type, and calculate their speed. The categories that they use to classify shock waves are frontal stationary, rear stationary, backward forming, backward recovery, forward forming, and forward recovery. To identify the waves, connected vehicles are driven through the highway, and every 3-5 seconds the GPS, timestamp, speed, and heading information are recorded. After a completed drive, classification and speed calculations are performed algorithmically to analyze wave behavior.
+Accurate real-time estimation of traffic state is a prerequisite for adaptive control. Stop-and-go waves can emerge spontaneously even in the absence of bottlenecks, as demonstrated experimentally by Sugiyama et al.\ \cite{Sugiyama2008}. Several approaches have been proposed to detect and characterize these waves. In \cite{futuretransp3040063}, the authors use connected vehicle data to identify shock waves in traffic, classify their type, and calculate their speed. The categories that they use to classify shock waves are frontal stationary, rear stationary, backward forming, backward recovery, forward forming, and forward recovery. To identify the waves, connected vehicles are driven through the highway, and every 3-5 seconds the GPS, timestamp, speed, and heading information are recorded. After a completed drive, classification and speed calculations are performed algorithmically to analyze wave behavior.
 
 Seo et al. \cite{7313231} use probe vehicles to estimate the state of traffic. These vehicles are equipped with spacing measurement equipment. The vehicles drive through traffic in a randomly distributed manner, collecting spacing and position data. The data is then used to derive fundamental diagram and density information. An Ensemble Kalman Filter then assimilates this information with data from a traffic flow model to provide an estimate of traffic state.
 
@@ -105,9 +107,10 @@ In \cite{doi:10.1177/0361198118796020}, the time gap setting of the ACC is adjus
 
 Elmorshedy et al. \cite{doi:10.1177/03611981231152459} use reinforcement learning to optimize traffic flow and minimize delay. The model outputs the ACC desired headway setting. Each state in the RL model includes the average flow and speed of vehicles in a roadway section as measured by a detector at the center of the road segment. The reward function was designed to maximize flow. In simulation, this controller improved network performance.
 
-{\color{red} Stojcsics et al. \cite{s21186089} demonstrate a safe integration of machine learning into an autonomous system. A Deep Neural Network (DNN) classifies system faults into predefined categories, and an Assurance Monitor quantifies the confidence in this classification. A Behavior Tree then executes the corresponding, predetermined safe control strategy, ensuring the learning component only influences high-level decisions, not low-level control signals. This architecture provides a template for enhancing our ACC. A similar LEC could be trained to perform our traffic state classification (e.g., "entering wave," "free-flow"). The Assurance Monitor would validate its output, and our existing state-dependent control laws would remain the safe, predetermined response, leveraging ML for improved accuracy without compromising safety.} (Should make this shorter, just to acknowledge that this approach exists)
+An important motivation for traffic-state-adaptive control is the empirical finding that commercially deployed ACC systems are not string stable. Gunter et al.\ \cite{Gunter2021StringStable} tested production ACC vehicles and showed that they amplify velocity disturbances, contributing to stop-and-go wave formation rather than suppressing it. This underscores the need for controllers that actively account for the surrounding traffic state. On the theoretical side, Ploeg et al.\ \cite{Ploeg2014} formalize $\mathcal{L}_p$ string stability for cascaded vehicle-following systems and show that a constant time-headway policy can guarantee string stability under appropriate gain selection, providing the analytical foundation for the type of linear control law used in our work.
 
-All of these strategies have a similar goal as our project: estimating the state of traffic and adjusting the control strategy accordingly to improve the overall state of traffic. Many of these works rely on external information from infrastructure that we will not have access to. Our controller predicts traffic state using only onboard information and still shows traffic state improvement in simulation.
+Stojcsics et al. \cite{s21186089} demonstrate a related architecture where a DNN classifier is paired with an assurance monitor and predetermined safe control strategies, ensuring that learned components influence only high-level decisions. A similar approach could enhance our traffic state classification while preserving the safety of the underlying control laws. 
+
 
 \section{Design}
 Our design has two main components: classification and state-specific control. The goal of classification is to identify the state of overall traffic based on the behavior of the lead vehicle. The state then determines the control strategy that we use in the vehicle.
@@ -424,14 +427,14 @@ In Figure \ref{fig:ngsim-jerk}, the average time that follower vehicles experien
     \label{fig:ngsim-jerk}
 \end{figure}
 
-The plot in Figure \ref{fig:ngsim-large-brake} shows how hard braking time changes at different penetration rates. With only the IDM, no hard braking was required, and the hard braking did not increase as the penetration increased.
+Across all penetration rates, the amount of time hard braking was constant. With only the IDM, no hard braking was required, and the hard braking did not increase as the penetration increased.
 
-\begin{figure}
-    \centering
-    \includegraphics[width=0.75\linewidth]{figures/ID 350 large brake.png}
-    \caption{NGSIM simulation hard braking events at varying penetration rates}
-    \label{fig:ngsim-large-brake}
-\end{figure}
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.75\linewidth]{figures/ID 350 large brake.png}
+%     \caption{NGSIM simulation hard braking events at varying penetration rates}
+%     \label{fig:ngsim-large-brake}
+% \end{figure}
 
 \section{Conclusions}
 
