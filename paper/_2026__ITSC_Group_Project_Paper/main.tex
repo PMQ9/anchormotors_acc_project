@@ -44,9 +44,9 @@
 
 \author{
 \IEEEauthorblockN{
-Daechul Jung\IEEEauthorrefmark{1},
-Quang Pham\IEEEauthorrefmark{1},
 Kate Sanborn\IEEEauthorrefmark{1},
+Quang Pham\IEEEauthorrefmark{1},
+Daechul Jung\IEEEauthorrefmark{1},
 Dan Work\IEEEauthorrefmark{1},
 Jonathan Sprinkle\IEEEauthorrefmark{1}
 }
@@ -90,27 +90,16 @@ This project addresses the limitation of reactive ACC by developing a Traffic St
 
 \section{Related Works}
 \subsection{Understanding the State of Traffic}
-Accurate real-time estimation of traffic state is a prerequisite for adaptive control. Stop-and-go waves can emerge spontaneously even in the absence of bottlenecks, as demonstrated experimentally by Sugiyama et al.\ \cite{Sugiyama2008}. Several approaches have been proposed to detect and characterize these waves. In \cite{futuretransp3040063}, the authors use connected vehicle data to identify shock waves in traffic, classify their type, and calculate their speed. The categories that they use to classify shock waves are frontal stationary, rear stationary, backward forming, backward recovery, forward forming, and forward recovery. To identify the waves, connected vehicles are driven through the highway, and every 3-5 seconds the GPS, timestamp, speed, and heading information are recorded. After a completed drive, classification and speed calculations are performed algorithmically to analyze wave behavior.
-
-Seo et al. \cite{7313231} use probe vehicles to estimate the state of traffic. These vehicles are equipped with spacing measurement equipment. The vehicles drive through traffic in a randomly distributed manner, collecting spacing and position data. The data is then used to derive fundamental diagram and density information. An Ensemble Kalman Filter then assimilates this information with data from a traffic flow model to provide an estimate of traffic state.
-
-Cao et al. \cite{https://doi.org/10.1049/iet-its.2018.5124} also use probe vehicles with spacing equipment to detect waves in traffic. These vehicles record information including timestamp, position, velocity, and spacing to the preceding vehicle and following vehicle. A single vehicle can identify a local shockwave using its speed, the speed of the preceding vehicle, and the speed of the following vehicle. If three consecutive trajectories decrease in speed, this is a local wave. Local waves identified from several different probe vehicles can be combined into a global wave. Information recorded from several probe vehicles also allows for the calculation of the wave speed.
-
-In these previous works, several vehicles are used to estimate the state of traffic. Some of these analyses cannot be performed in real-time and are instead performed later using the recorded data. For this work, the vehicle only has data from a single vehicle that can be used to estimate the state of traffic.
+Stop-and-go waves can emerge unexpectedly even without bottlenecks, as presented experimentally by Sugiyama et al.\ \cite{Sugiyama2008}, this motivates real-time detection methods. Sakhare et al.\ \cite{futuretransp3040063} classify six shock-wave types from connected-vehicle GPS traces; Seo et al.\ \cite{7313231} use probe-vehicle spacing data and an Ensemble Kalman Filter to reconstruct density fields; and Cao et al.\ \cite{https://doi.org/10.1049/iet-its.2018.5124} detect end-of-queue shockwaves by combining local speed drops across multiple spacing-equipped probe vehicles. These methods share a common limitation: they require \emph{fleets} of instrumented or connected vehicles and, in some cases, offline post-processing. In contrast, our approach classifies the traffic wave phase using only onboard measurements from a \emph{single} ego vehicle in real time.
 
 \subsection{ACC that Adapts to Traffic State}
-Several ACC strategies have been implemented that dynamically adjust based on the state of traffic. In \cite{STERN2018205}, the FollowerStopper controller is used in a ring road experiment. The goal of the controller is to drive at the desired velocity when it is safe to do so and drive at a lesser velocity when necessary. The vehicle successfully dampened waves with peak performance at 7.5 m/s. It also was able to lessen excessive braking and fuel consumption.
-
-Kesting et al. \cite{KESTING2008668} design an ACC system that classifies the state of traffic and then adjusts the control strategy accordingly. The five states that this work identifies are moving in free traffic, approaching an upstream congestion front, moving in congested traffic, leaving the downstream congestion front, and passing infrastructural bottleneck sections (such as road work or intersections). The inputs used in this controller are velocity, space gap, and relative velocity. In addition, GPS data is used to help identify where bottlenecks may occur. A moving average of the ego velocity is used to help determine what traffic state the vehicle is in, though there is a slight delay in state identification. The traffic state is then used to adjust the time gap and two other parameters in the intelligent driver model. In simulation, this strategy improved traffic stability and road capacity.
-
-In \cite{doi:10.1177/0361198118796020}, the time gap setting of the ACC is adjusted based on the traffic conditions. The vehicles running ACC receive information about the flow and speed of different sections of the roadway with vehicle-to-infrastructure communication. The time gap of vehicles is adjusted to maximize flow for the given segment and prevent future congestion. Higher penetration rates of this controller were shown to improve average vehicle delay and total fuel consumption in simulation.
-
-Elmorshedy et al. \cite{doi:10.1177/03611981231152459} use reinforcement learning to optimize traffic flow and minimize delay. The model outputs the ACC desired headway setting. Each state in the RL model includes the average flow and speed of vehicles in a roadway section as measured by a detector at the center of the road segment. The reward function was designed to maximize flow. In simulation, this controller improved network performance.
+Several ACC strategies have been implemented that dynamically adjust based on the state of traffic. Stern et al.\ \cite{STERN2018205} demonstrated that a single autonomous vehicle running the FollowerStopper controller can dampen stop-and-go waves on a ring road while reducing excessive braking and fuel consumption. Kesting et al.\ \cite{KESTING2008668} designed a traffic-state-adaptive ACC that detects five congestion phases and schedules IDM parameters accordingly; their system improved stability and capacity in simulation but relies on GPS-assisted bottleneck detection and a moving-average velocity classifier that introduces identification delay. Spiliopoulou et al.\ \cite{doi:10.1177/0361198118796020} and Elmorshedy et al.\ \cite{doi:10.1177/03611981231152459} both adjust ACC headway settings to maximize throughput, but depend on vehicle-to-infrastructure communication or roadside detectors for section-level flow and speed measurements.
 
 An important motivation for traffic-state-adaptive control is the empirical finding that commercially deployed ACC systems are not string stable. Gunter et al.\ \cite{Gunter2021StringStable} tested production ACC vehicles and showed that they amplify velocity disturbances, contributing to stop-and-go wave formation rather than suppressing it. This underscores the need for controllers that actively account for the surrounding traffic state. On the theoretical side, Ploeg et al.\ \cite{Ploeg2014} formalize $\mathcal{L}_p$ string stability for cascaded vehicle-following systems and show that a constant time-headway policy can guarantee string stability under appropriate gain selection, providing the analytical foundation for the type of linear control law used in our work.
 
-Stojcsics et al. \cite{s21186089} demonstrate a related architecture where a DNN classifier is paired with an assurance monitor and predetermined safe control strategies, ensuring that learned components influence only high-level decisions. A similar approach could enhance our traffic state classification while preserving the safety of the underlying control laws. 
+In the learning-enabled domain, Stojcsics et al.\ \cite{s21186089} pair a DNN classifier with an assurance monitor and predetermined safe strategies, illustrating how data-driven perception can be integrated without compromising control-layer safety guarantees.
 
+Unlike the previous approaches, our controller requires neither GPS, V2I communication, nor multi-vehicle coordination. It uses a deterministic state machine operating on ego speed, gap, and relative speed to classify four wave phases in real time, and schedules mode-specific linear control gains to damp disturbances while maintaining safety constraints.
 
 \section{Design}
 Our design has two main components: classification and state-specific control. The goal of classification is to identify the state of overall traffic based on the behavior of the lead vehicle. The state then determines the control strategy that we use in the vehicle.
@@ -179,7 +168,7 @@ Out of Wave & 1.100 & 2.400 & 10 & 0.240 \\
 \end{center}
 \end{table}
 
-The into wave mode parameters allow the controller to aggressively reduce speed to match traffic. The in wave parameters are designed to maintain stable following with conservative gains. The out of wave mode parameters allow the vehicle to rapidly accelerate away from slow traffic.
+The into wave mode parameters allow the controller to aggressively reduce the speed to match traffic. The in wave parameters are designed to maintain stable following with conservative gains. The out of wave mode parameters allow the vehicle to rapidly accelerate away from slow traffic.
 
 \subsubsection{No Wave Mode: Dynamic Velocity Limiting}
 
@@ -401,7 +390,7 @@ Figure \ref{fig:ngsim-50-vel} shows the velocities of the fleet when half of the
     \label{fig:ngsim-50-vel-dist}
 \end{figure}
 
-Figure \ref{fig:ngsim-50-vel} shows the velocities of the fleet when all vehicles use the experimental controller. Figure \ref{fig:ngsim-50-vel-dist} shows the distribution of the velocities of all vehicles. Disturbances are dampened. Also, the velocity distribution shrinks backwards in the line of vehicles.
+Figure \ref{fig:ngsim-100-vel} shows the velocities of the fleet when all vehicles use the experimental controller. Figure \ref{fig:ngsim-100-vel-dist} shows the distribution of the velocities of all vehicles. Disturbances are dampened. Also, the velocity distribution shrinks backwards in the line of vehicles.
 
 
 \begin{figure}
