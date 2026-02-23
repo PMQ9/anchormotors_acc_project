@@ -283,59 +283,33 @@ To evaluate string stability in the ROS/Docker setting, which contains a single 
 
 We evaluated the controller in a large-scale fleet simulation with 25 vehicles, a 100-second duration, and a 0.05-second time step. The lead vehicle follows synthetic trajectories across 15 scenarios in five categories: constant speed (15, 20, 25~m/s), oscillation (small, medium, large amplitude, multi-frequency), sudden acceleration (gradual, rapid), sudden deceleration (gradual, rapid, severe), and step changes (two-state, three-state, frequent). Penetration rates of 5\%, 10\%, 20\%, 50\%, 75\%, and 100\% were tested at each scenario. Vehicles not running the experimental controller use the IDM.
 
-\subsubsection{Constant Speed Scenarios}
+Table~\ref{tab:synth-summary} summarizes string stability improvement and minimum space gap across the five scenario categories. String stability is computed as the ratio of tail-vehicle to lead-vehicle velocity standard deviation; values below 1.0 indicate disturbance attenuation.
 
-In the constant-speed scenarios, the lead vehicle maintains a fixed velocity while the fleet adapts from an initial equilibrium spacing of approximately 60~m. Figure~\ref{fig:synth-const-comparison} shows how fleet performance metrics change with ACC penetration rate for the constant slow (15~m/s) scenario. String stability improved by 100\% from 5\% to 100\% penetration, and minimum space gap increased from 28.6~m to 43.2~m. At 100\% penetration (Figure~\ref{fig:synth-const-100}), all vehicles converge smoothly to the lead speed with no velocity oscillation, while at 5\% penetration (Figure~\ref{fig:synth-const-005}) the predominantly human fleet exhibits noticeable velocity spread.
+\begin{table}[htbp]
+\caption{Synthetic simulation results: string stability ratio and minimum space gap at 5\% vs.\ 100\% ACC penetration.}
+\begin{center}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Category} & \textbf{SS (5\%$\to$100\%)} & \textbf{Improv.} & \textbf{Min Gap (5\%$\to$100\%)} \\
+\hline
+Constant speed & 2.7$\to$0.0 & $\sim$100\% & 29--57$\to$43--68~m \\
+\hline
+Oscillation$^*$ & 2.1--3.6$\to$0.4--2.1 & 41--82\% & 40--44$\to$45--50~m \\
+\hline
+Accel.\ transient & 0.5--0.6$\to$0.1 & 86--88\% & 29$\to$43~m \\
+\hline
+Decel.\ transient & 20--48$\to$0.4--2.6 & 98--99\% & 18--29$\to$33--43~m \\
+\hline
+Step changes$^*$ & 0.3--2.1$\to$0.2--0.8 & 13--90\% & 31--42$\to$43--50~m \\
+\hline
+\end{tabular}
+\label{tab:synth-summary}
+\end{center}
+\vspace{-0.5em}
+{\footnotesize $^*$Excludes multi-frequency oscillation (02d), where string stability degraded from 1.86 to 10.8 at 100\% penetration; see text.}
+\end{table}
 
-\begin{figure}
-    \centering
-    \includegraphics[width=\linewidth]{figures/synth_01a_constant_slow_comparison.png}
-    \caption{Constant slow scenario: fleet metrics vs.\ ACC penetration rate.}
-    \label{fig:synth-const-comparison}
-\end{figure}
-
-\begin{figure}
-    \centering
-    \includegraphics[width=\linewidth]{figures/synth_01a_constant_slow_005.png}
-    \caption{Constant slow scenario at 5\% ACC penetration.}
-    \label{fig:synth-const-005}
-\end{figure}
-
-\begin{figure}
-    \centering
-    \includegraphics[width=\linewidth]{figures/synth_01a_constant_slow_100.png}
-    \caption{Constant slow scenario at 100\% ACC penetration.}
-    \label{fig:synth-const-100}
-\end{figure}
-
-\subsubsection{Oscillation Scenarios}
-
-The oscillation scenarios test the controller's ability to dampen periodic disturbances in the fleet. Figure~\ref{fig:synth-osc-med-comparison} shows the penetration rate comparison for the medium oscillation scenario ($\pm$5~m/s, 20~s period). String stability improved by 50.4\% from 5\% to 100\% penetration. In the large-amplitude, fast-period oscillation ($\pm$7~m/s, 10~s period), shown in Figure~\ref{fig:synth-osc-large-comparison}, the improvement reached 82.1\%. At 100\% penetration in the medium oscillation (Figure~\ref{fig:synth-osc-med-100}), the ACC vehicles collectively track the lead vehicle oscillation while dampening disturbance propagation through the fleet. Across all oscillation scenarios, ACC vehicles act as wave absorbers, reducing the amplification of velocity disturbances downstream.
-
-\begin{figure}
-    \centering
-    \includegraphics[width=\linewidth]{figures/synth_02b_oscillation_medium_comparison.png}
-    \caption{Medium oscillation scenario: fleet metrics vs.\ ACC penetration rate.}
-    \label{fig:synth-osc-med-comparison}
-\end{figure}
-
-\begin{figure}
-    \centering
-    \includegraphics[width=\linewidth]{figures/synth_02b_oscillation_medium_100.png}
-    \caption{Medium oscillation scenario at 100\% ACC penetration.}
-    \label{fig:synth-osc-med-100}
-\end{figure}
-
-\begin{figure}
-    \centering
-    \includegraphics[width=\linewidth]{figures/synth_02c_oscillation_large_fast_comparison.png}
-    \caption{Large fast oscillation scenario: fleet metrics vs.\ ACC penetration rate.}
-    \label{fig:synth-osc-large-comparison}
-\end{figure}
-
-\subsubsection{Sudden Deceleration and Step Change Scenarios}
-
-The sudden deceleration scenarios evaluate safety under emergency-like conditions. In the rapid deceleration scenario (25~m/s to 15~m/s in 2~seconds), shown in Figure~\ref{fig:synth-decel-comparison}, minimum space gaps remained well above the 5~m safety threshold at all penetration rates. In the step change scenarios, the lead vehicle repeatedly alternates between discrete speed states. Figure~\ref{fig:synth-step-comparison} shows the two-state step change (alternating between 15 and 25~m/s every 15~seconds). Higher ACC penetration rates consistently reduced velocity variance and smoothed the fleet response to repeated transitions.
+The controller's largest impact is on sudden-deceleration scenarios — the most safety-critical category — where string stability ratios collapse from 20--48$\times$ (severe amplification under IDM-dominated fleets) to 0.4--2.6 at full penetration, and minimum gaps increase from 18~m to 33~m. Constant-speed following achieves near-perfect attenuation (ratio $\to$ 0), and single-frequency oscillation scenarios show 41--82\% improvement, with the controller acting as a wave absorber. Figure~\ref{fig:synth-decel-comparison} illustrates the penetration-rate dependence for the rapid deceleration scenario (25$\to$15~m/s in 2~s).
 
 \begin{figure}
     \centering
@@ -344,16 +318,9 @@ The sudden deceleration scenarios evaluate safety under emergency-like condition
     \label{fig:synth-decel-comparison}
 \end{figure}
 
-\begin{figure}
-    \centering
-    \includegraphics[width=\linewidth]{figures/synth_05a_step_changes_comparison.png}
-    \caption{Two-state step change scenario: fleet metrics vs.\ ACC penetration rate.}
-    \label{fig:synth-step-comparison}
-\end{figure}
+Two failure modes were identified. In the multi-frequency oscillation scenario (superimposed 40~s and 10~s periods), string stability degraded from 1.86 at 5\% to 10.8 at 100\% penetration, indicating that the state machine's transition logic interacts poorly with complex wave spectra. In the two-state step-change scenario (15$\leftrightarrow$25~m/s every 15~s), the string stability ratio increased from 0.33 to 0.83 — still below 1.0 (string-stable), but less effective than the IDM fleet. Minimum space gaps nonetheless improved in both cases, so safety was not compromised.
 
-\subsubsection{Summary of Synthetic Results}
-
-Across all 15 scenarios, increasing ACC penetration monotonically improved string stability. Maximum jerk decreased from approximately 15~m/s$^3$ at low penetration to 6.8~m/s$^3$ at 100\% penetration, as the human driver model's abrupt reactions were replaced by smoother ACC control. Maximum deceleration remained within the $-3.0$~m/s$^2$ hard braking threshold for all scenarios except the severe deceleration stress test, and minimum space gaps increased with penetration rate, indicating improved safety margins.
+Across all 15 scenarios, maximum jerk decreased from $\sim$15~m/s$^3$ at 5\% penetration to 6.8~m/s$^3$ at 100\%, as the IDM's abrupt reactions were replaced by smoother ACC commands. Maximum deceleration stayed within the $-3.0$~m/s$^2$ hard-braking limit for all scenarios except the severe stress test (25$\to$10~m/s in 3~s), and minimum space gaps increased monotonically with penetration rate across every scenario tested.
 
 \subsection{NGSIM Trajectory Simulation}
 
