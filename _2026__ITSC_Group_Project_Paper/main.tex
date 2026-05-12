@@ -81,7 +81,7 @@ jonathan.sprinkle@vanderbilt.edu
 \maketitle
 
 \begin{abstract}
-% Stop-and-go (phantom) traffic waves can be amplified by conventional adaptive cruise control (ACC) that reacts only to the immediate leader. We propose a traffic-wave phase–aware ACC that uses only onboard car-following signals (ego speed, gap, relative speed) to classify whether the ego vehicle is outside a wave, entering, inside, or exiting a stop-and-go wave, and then switches control parameters to damp disturbances while maintaining safety. In 25-vehicle simulations across 15 synthetic leader scenarios, increasing penetration of the proposed controller yields monotonic string-stability improvement and reduces peak acceleration transients (e.g., maximum jerk decreases from ~15 to ~6.8 m/s³ at full penetration). We further evaluate mixed-penetration platoons using NGSIM leader trajectories, showing reduced disturbance amplification in fleet speed distributions, but also identifying jerk increases at higher penetration due to abrupt mode transitions. These results motivate transition-smoothing as future work to preserve wave damping while improving comfort. Conclusions and future work for this project are also discussed.
+% Stop-and-go (phantom) traffic waves can be amplified by conventional adaptive cruise control (ACC) that reacts only to the immediate leader. We propose a traffic-wave phase–aware ACC that uses only onboard car-following signals (ego speed, gap, relative speed) to classify whether the ego vehicle is outside a wave, entering, inside, or exiting a stop-and-go wave, and then switches control parameters to damp disturbances while maintaining safety. In 25-vehicle simulations across 15 synthetic leader scenarios, increasing penetration of the proposed controller yields monotonic string-stability improvement and reduces peak acceleration transients (e.g., maximum jerk decreases from ~15 to ~6.8 [m/s³] at full penetration). We further evaluate mixed-penetration platoons using NGSIM leader trajectories, showing reduced disturbance amplification in fleet speed distributions, but also identifying jerk increases at higher penetration due to abrupt mode transitions. These results motivate transition-smoothing as future work to preserve wave damping while improving comfort. Conclusions and future work for this project are also discussed.
 Stop-and-go (phantom) traffic waves can be amplified by conventional adaptive cruise control (ACC) that reacts only to the immediate leader. We propose a traffic-wave phase–aware ACC that uses only onboard car-following signals (ego speed, gap, relative speed) to classify whether the ego vehicle is outside a wave, entering, inside, or exiting a stop-and-go wave, and then switches control parameters to damp disturbances while maintaining safety. In 25-vehicle simulations across 15 synthetic leader scenarios, increasing penetration of the proposed controller yields a monotonic string-stability improvement, although the controller design violates desired jerk constraints. We further evaluate mixed-penetration platoons using NGSIM leader trajectories, showing reduced disturbance amplification in fleet speed distributions, but also identifying jerk increases at higher penetration due to abrupt mode transitions. These results motivate transition-smoothing for future work to preserve wave damping while improving comfort. Conclusions and future work for this project are also discussed.
 \end{abstract}
 
@@ -150,7 +150,7 @@ We use a state machine to determine the state. Most of the transition criteria a
 
 \begin{figure*}[t]
     \centering
-    \includegraphics[width=0.70\linewidth]{figures/fig_classification.png}
+    \includegraphics[width=0.75\linewidth]{figures/ITSC 2026 Group Project Classification.png}
     \caption{Classification state diagram. $s_n$ is the space gap, $v_l$ is the lead-vehicle velocity, $v_{l,avg}$ is the moving average of the lead-vehicle velocity, and $a_{l,avg}$ is the moving average of the lead-vehicle acceleration. $v_{slow}$ ($10$~[m/s]) and $v_{fast}$ ($13.5$~[m/s]) are tunable transition thresholds.}
     \label{fig:class_state}
 \end{figure*}
@@ -285,39 +285,39 @@ The following section discusses the ROS/Docker simulation results for the three 
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\linewidth]{figures/fig_ros_jerk_time.png}
-    \caption{ROS/Docker simulation: jerk time history derived from the commanded acceleration. Dashed lines mark the $\pm 0.5~\mathrm{[m/s^3]}$ comfort threshold.}
+    \includegraphics[width=1\linewidth]{figures/jerk_distribution.png}
+    \caption{ROS/Docker simulation: jerk derived from command acceleration. Dashed lines mark the $\pm 0.5~\mathrm{[m/s^3]}$ comfort threshold.}
     \label{fig:ros-jerk}
 \end{figure}
-\begin{figure}[t]
+\begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{figures/fig_ros_jerk_hist.png}
+    \includegraphics[width=1\linewidth]{figures/jerk_distribution2.png}
     \caption{ROS/Docker simulation: distribution of $|j|$ over the run.}
     \label{fig:ros-jerk-dist}
 \end{figure}
 Figure~\ref{fig:ros-hard-brake} shows the commanded acceleration \(a_{\mathrm{cmd}}\) over time with the hard-braking threshold marked. Across the entire ROS/Docker run, the \(a_{\mathrm{cmd}}\) stays well above the hard-braking region, indicating that the controller avoids harsh deceleration and remains in a moderate braking regime. Overall, the ROS/Docker results demonstrate that the controller satisfies the hard-braking safety objective in this single-lead/single-follower scenario.
 
-\begin{figure}[t]
+\begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{figures/fig_ros_hardbrake.png}
-    \caption{ROS/Docker simulation: commanded acceleration. The dashed line marks the $-3.0~\mathrm{[m/s^2]}$ hard-braking threshold.}
+    \includegraphics[width=1\linewidth]{figures/limit_hard_breaking.png}
+    \caption{ROS/Docker simulation commanded acceleration with hard-braking threshold.}
     \label{fig:ros-hard-brake}
 \end{figure}
 
 % To evaluate string stability in the ROS/Docker setting, we use a single-follower based on the propagation of speed disturbances from the lead vehicle to the ego vehicle. 
 We evaluate string stability based on single-follower scenario. Figure~\ref{fig:ros-string} compares the lead and ego velocity traces and summarizes the relative speed behavior. The ego vehicle does not exhibit larger oscillations than the lead vehicle, and speed disturbances are not amplified in the follower, indicating stable tracking without sustained growth in oscillations. Under this metric, the ROS/Docker results are consistent with string-stable behavior for the tested scenario.
 
-\begin{figure}[t]
+\begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{figures/fig_ros_string.png}
-    \caption{ROS/Docker simulation: lead and ego velocity traces. The ego does not amplify lead-vehicle speed disturbances.}
+    \includegraphics[width=0.9\linewidth]{figures/string_stability.png}
+    \caption{ROS/Docker simulation string-stability results using lead and ego velocity signals.}
     \label{fig:ros-string}
 \end{figure}
 
 
 \subsection{Synthetic Trajectory Simulation}
 
-We evaluated the controller in a large-scale fleet simulation with 25 vehicles, a $100$~[s] duration, and a $0.05$~[s] time step. The lead vehicle follows synthetic trajectories across 15 scenarios in five categories: constant speed ($15$, $20$, $25$~[m/s]), oscillation (small, medium, large amplitude, multi-frequency), sudden acceleration (gradual, rapid), sudden deceleration (gradual, rapid, severe), and step changes (two-state, three-state, frequent). Penetration rates of 5\%, 10\%, 20\%, 50\%, 75\%, and 100\% were tested at each scenario. Vehicles not running the experimental controller use the IDM.
+We evaluated the controller in a large-scale fleet simulation with 25 vehicles, a 100-second duration, and a 0.05-second time step. The lead vehicle follows synthetic trajectories across 15 scenarios in five categories: constant speed (15, 20, 25~m/s), oscillation (small, medium, large amplitude, multi-frequency), sudden acceleration (gradual, rapid), sudden deceleration (gradual, rapid, severe), and step changes (two-state, three-state, frequent). Penetration rates of 5\%, 10\%, 20\%, 50\%, 75\%, and 100\% were tested at each scenario. Vehicles not running the experimental controller use the IDM.
 
 % \subsubsection{Constant Speed Scenarios}
 
@@ -376,31 +376,31 @@ Step changes$^*$ & 0.3--2.1$\to$0.2--0.8 & 13--90\% & 31--42$\to$43--50~[m] \\
 
 % \jms{Note that Table \ref{tab:synth-summary} is running over the column and will need to be fixed before submission.}
 
-\begin{figure}[t]
+\begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{figures/fig_synth_decel.png}
-    \caption{Rapid-deceleration scenario ($25\!\to\!15$~[m/s] in $2$~[s]) at varying ACC penetration. String stability improves monotonically, while min space gap and max deceleration both stay within design limits at high penetration.}
+    \includegraphics[width=0.9\linewidth]{figures/synth_04b_sudden_decel_rapid_comparison.png}
+    \caption{Rapid-deceleration scenario ($25\!\to\!10$~[m/s] in $3$~[s]) at varying ACC penetration. String stability improves monotonically, while min space gap and max deceleration both stay within design limits at high penetration.}
     \label{fig:synth-decel-comparison}
 \end{figure}
 
-Across all 15 scenarios, maximum jerk decreased from $\sim$15~[m/s$^3$] at 5\% penetration to 6.8~[m/s$^3$] at 100\%, as the IDM's abrupt reactions were replaced by smoother ACC commands. Maximum deceleration stayed within the $-3.0$~[m/s$^2$] hard-braking limit for all scenarios except the severe stress test ($25$$\to$$10$~[m/s] in $3$~[s]), and minimum space gaps increased monotonically with penetration rate across every scenario tested.
+Across all 15 scenarios, maximum jerk decreased from $\sim$15~m/s$^3$ at 5\% penetration to 6.8~m/s$^3$ at 100\%, as the IDM's abrupt reactions were replaced by smoother ACC commands. Maximum deceleration stayed within the $-3.0$~m/s$^2$ hard-braking limit for all scenarios except the severe stress test (25$\to$10~m/s in 3~s), and minimum space gaps increased monotonically with penetration rate across every scenario tested.
 
 \subsection{NGSIM Trajectory Simulation}
 
 The following section discusses the results of following an NGSIM trajectory with varying penetration rates of the experimental controller. Figure \ref{fig:ngsim-0-vel} shows the velocities of the fleet when all following vehicles use the IDM. Figure \ref{fig:ngsim-0-vel-dist} shows the distribution of the velocities of all vehicles. It is clear that by itself, the IDM propagates and amplifies disturbances backwards in the lane of vehicles. The traffic wave amplifies backwards. Even though the leader never comes to a full stop, several following vehicles are forced to stop.
 
-\begin{figure}[t]
+\begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{figures/fig_ngsim_0_vel.png}
-    \caption{NGSIM (vehicle ID 350) leader: follower velocities at 0\% penetration. The IDM propagates and amplifies disturbances upstream.}
+    \includegraphics[width=0.875\linewidth]{figures/ID 350 0 percent velocities.png}
+    \caption{NGSIM simulation velocities, 0\% penetration}
     \label{fig:ngsim-0-vel}
 \end{figure}
 
 
-\begin{figure}[t]
+\begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{figures/fig_ngsim_0_dist.png}
-    \caption{NGSIM, 0\% penetration: per-car velocity distribution. Spread widens with car index, indicating upstream amplification.}
+    \includegraphics[width=0.875\linewidth]{figures/ID 350 0 percent velocity distrbution.png}
+    \caption{NGSIM simulation velocity distributions, 0\% penetration}
     \label{fig:ngsim-0-vel-dist}
 \end{figure}
 
@@ -423,17 +423,17 @@ The following section discusses the results of following an NGSIM trajectory wit
 Figure \ref{fig:ngsim-100-vel} shows the velocities of the fleet when all vehicles use the experimental controller. Figure \ref{fig:ngsim-100-vel-dist} shows the distribution of the velocities of all vehicles. Disturbances are dampened. Also, the velocity distribution shrinks backwards in the line of vehicles.
 
 
-\begin{figure}[t]
+\begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{figures/fig_ngsim_100_vel.png}
-    \caption{NGSIM, 100\% penetration: follower velocities. Disturbances are dampened along the platoon.}
+    \includegraphics[width=0.875\linewidth]{figures/ID 350 100 percent velocities.png}
+    \caption{NGSIM simulation velocities, 100\% penetration}
     \label{fig:ngsim-100-vel}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{figures/fig_ngsim_100_dist.png}
-    \caption{NGSIM, 100\% penetration: per-car velocity distribution. The spread does not grow upstream.}
+    \includegraphics[width=0.875\linewidth]{figures/ID 350 100 percent velocity distrbution.png}
+    \caption{NGSIM simulation velocity distributions, 100\% penetration}
     \label{fig:ngsim-100-vel-dist}
 \end{figure}
 
@@ -495,7 +495,7 @@ This work presents a controller that classifies the state of traffic and adjusts
 
 % In the NGSIM simulations, high jerk increased with increasing penetration rates, likely due to abrupt acceleration changes at mode switches. This goal was not accomplished for the NGSIM simulations.
 
-All simulation environments demonstrate violations of the goal of limiting the magnitude of the jerk to less than $0.5~\mathrm{[m/s^3]}$. In some scenarios, such as aggressive braking, high jerk is expected. However, in many of these simulations, the high jerk results from mode switching. In the NGSIM simulations, the average time with high jerk events increases as the penetration rate of the multi-mode controller is increased. This is likely due to mode switching that causes abrupt acceleration changes. The synthetic simulations show improvements in jerk as the penetration increases, but this is because very few of the synthetic simulation test cases trigger mode switches. There is a trade off between mode switching and rider comfort. Although mode switching can allow better responses to the current state of traffic, this can increase jerk and decrease rider comfort.
+All simulation environments demonstrate violations of the goal of limiting the magnitude of the jerk to less than 0.5 m/s\textsuperscript{3}. In some scenarios, such as aggressive braking, high jerk is expected. However, in many of these simulations, the high jerk results from mode switching. In the NGSIM simulations, the average time with high jerk events increases as the penetration rate of the multi-mode controller is increased. This is likely due to mode switching that causes abrupt acceleration changes. The synthetic simulations show improvements in jerk as the penetration increases, but this is because very few of the synthetic simulation test cases trigger mode switches. There is a trade off between mode switching and rider comfort. Although mode switching can allow better responses to the current state of traffic, this can increase jerk and decrease rider comfort.
 
 \subsubsection{Limit Hard Braking Events}
 
